@@ -139,6 +139,7 @@ class VideoWorker(object):
             return video_message
 
     async def on_download_error(self, dm: DownloadManager, e: YoutubeDLError) -> None:
+        """handle download error"""
         network_error_tokens = (
             'The read operation timed out',
             'Connection reset by peer',
