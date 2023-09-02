@@ -4,7 +4,7 @@ from traceback import format_exc
 
 from aiogram import Bot, Dispatcher
 from aiogram.bot.api import TelegramAPIServer
-from aiogram.types import Message, ParseMode
+from aiogram.types import BotCommand, Message, ParseMode
 from aiogram.types.base import Integer
 from aiogram.utils import executor
 from yt_dlp.utils import DownloadError
@@ -281,6 +281,17 @@ async def _(message: Message):
     await message.reply(f'task added\ntotal task(s): {worker.get_pending_tasks_count()}')
 
 
+async def on_startup(dp_: Dispatcher) -> None:
+    await dp_.bot.set_my_commands([
+        BotCommand('start', 'hello'),
+        BotCommand('check', 'check all videos whether they are still available'),
+        BotCommand('cancel', 'cancel all waiting tasks'),
+        BotCommand('stat', 'show statistics'),
+        BotCommand('add_list', 'add all videos in a playlist'),
+        BotCommand('retry', 'retry all videos with network error'),
+    ])
+
+
 if __name__ == '__main__':
     downloads_dir = Path(DOWNLOAD_ROOT)
     if not downloads_dir.exists():
@@ -290,4 +301,4 @@ if __name__ == '__main__':
     worker = VideoWorker(global_loop)
     global_loop.create_task(worker.work())
 
-    executor.start_polling(dp, skip_updates=True)
+    executor.start_polling(dp, skip_updates=True, on_startup=on_startup)
