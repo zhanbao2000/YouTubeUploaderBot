@@ -240,6 +240,7 @@ async def _(message: Message):
                         f'transfer file(s): {worker.current_running_transfer_files}\n'
                         f'transfer size: {format_file_size(worker.current_running_transfer_size)}\n'
                         f'pending task(s): {worker.get_pending_tasks_count()}\n'
+                        f'retry list size: {len(worker.current_running_retry_list)}\n'
                         f'database size: {get_db_size()}\n'
                         f'saved unavailable video(s): {get_unavailable_videos_count()}')
 
