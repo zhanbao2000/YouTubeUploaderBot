@@ -34,6 +34,7 @@ class VideoWorker(object):
         self.current_message_id = None  # the message which triggered this task, for replying
         self.current_running_transfer_files = 0  # total files transferred from startup
         self.current_running_transfer_size = 0  # total size transferred from startup
+        self.current_running_retry_list: list[str] = []  # save links with download error (only network error)
 
     def get_pending_tasks_count(self) -> int:
         """return pending tasks = waiting + current"""
@@ -43,9 +44,36 @@ class VideoWorker(object):
         """return waiting tasks = queue size"""
         return self.video_queue.qsize()
 
+    def add_retry_link(self, url: str, e: DownloadError) -> bool:
+        """add a link to retry list if this link has network error"""
+        network_error_tokens = (
+            'The read operation timed out',
+            'Connection reset by peer',
+            'HTTP Error 503: Service Unavailable',
+            'The handshake operation timed out'
+        )
+
+        if any(token in e.msg for token in network_error_tokens):
+            self.current_running_retry_list.append(url)
+            return True
+        return False
+
     async def add_task(self, url: str, chat_id: Integer, message_id: Integer) -> None:
         """add a new task"""
         await self.video_queue.put((url, chat_id, message_id))
+
+    async def add_task_batch(self, url_list: list[str], chat_id: Integer, message_id: Integer) -> int:
+        """add many new tasks"""
+        count_task_added = 0
+        for url in url_list:
+
+            if is_in_database(get_video_id(url)):
+                continue
+
+            await self.video_queue.put((url, chat_id, message_id))
+            count_task_added += 1
+
+        return count_task_added
 
     async def reply(self, text: str, **kwargs) -> Message:
         """reply to the message which triggered current task"""
@@ -123,6 +151,7 @@ class VideoWorker(object):
                 video_message_id = (await self.upload_video(dm.file, video_info)).message_id
 
             except DownloadError as e:
+                self.add_retry_link(url, e)
                 await self.reply(f'error on uploading this video: {dm.video_id}\n{e.msg}')
 
             except Exception:  # noqa
@@ -213,17 +242,22 @@ async def _(message: Message):
 
     video_urls = await get_all_video_urls_from_playlist(playlist_id)
     count_urls = len(video_urls)
-    count_urls_filtered = 0
 
-    for url in video_urls:
-
-        if is_in_database(get_video_id(url)):
-            continue
-
-        await worker.add_task(url, message.chat.id, message.message_id)
-        count_urls_filtered += 1
+    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.message_id)
 
     await message.reply(f'{count_urls} video(s) in this list\n'
+                        f'{count_urls - count_urls_filtered} video(s) skipped\n'
+                        f'{count_urls_filtered} task(s) added')
+
+
+@dp.message_handler(commands=['retry'])
+async def _(message: Message):
+    count_urls = len(worker.current_running_retry_list)
+
+    count_urls_filtered = await worker.add_task_batch(worker.current_running_retry_list, message.chat.id, message.message_id)
+    worker.current_running_retry_list.clear()
+
+    await message.reply(f'{count_urls} video(s) in current retry list\n'
                         f'{count_urls - count_urls_filtered} video(s) skipped\n'
                         f'{count_urls_filtered} task(s) added')
 
