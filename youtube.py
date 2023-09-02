@@ -73,7 +73,14 @@ class DownloadManager(object):
         """download the video and return the info dict"""
         with YoutubeDL(ydl_options) as ydl:
             info_dict = ydl.extract_info(self.url, download=False)
-            print_formats_list(info_dict)
+            video_formats, audio_formats = get_formats_list(info_dict['formats'])
+
+            # check if all formats have filesize == 0
+            if (
+                    all(format_.filesize == 0 for format_ in video_formats) or
+                    all(format_.filesize == 0 for format_ in audio_formats)
+            ):
+                raise RuntimeError('Inconclusive download format, please try again later.')
 
             ydl.params.update({
                 'skip_download': False,
