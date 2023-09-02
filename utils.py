@@ -3,6 +3,8 @@ from typing import Optional
 
 from httpx import AsyncClient, AsyncHTTPTransport
 
+from config import SUPERUSERS
+
 
 def convert_date(date: str) -> str:
     """convert date string to human-readable format"""
@@ -28,6 +30,10 @@ def escape_markdown(text: str):
     """escape markdown characters"""
     escape_chars = r'\*_\[\]()~`>#+-=|{}.!'
     return sub(r'([' + escape_chars + '])', r'\\\1', str(text))
+
+
+def is_superuser(chat_id: int) -> bool:
+    return chat_id in SUPERUSERS
 
 
 def get_client(proxies: Optional[str] = None, timeout: float = 15, retries: int = 5, **kwargs) -> AsyncClient:

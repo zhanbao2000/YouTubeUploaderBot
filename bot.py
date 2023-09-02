@@ -14,7 +14,7 @@ from database import (
     insert_uploaded, is_in_database, is_available, update_available,
     get_db_size, get_all_video_ids, get_upload_message_id, get_unavailable_videos_count
 )
-from utils import format_file_size, create_message_link
+from utils import format_file_size, create_message_link, is_superuser
 from youtube import (
     DownloadManager, is_video_available_online, get_video_caption,
     get_video_id, get_playlist_id, get_all_video_urls_from_playlist, get_thumbnail
@@ -179,6 +179,9 @@ async def _(message: Message):
 
 @dp.message_handler(commands=['check'])
 async def _(message: Message):
+    if not is_superuser(message.chat.id):
+        return
+
     video_ids = get_all_video_ids()
     count_all = len(video_ids)
     count_become_available = 0
@@ -221,12 +224,18 @@ async def _(message: Message):
 
 @dp.message_handler(commands=['cancel'])
 async def _(message: Message):
+    if not is_superuser(message.chat.id):
+        return
+
     await message.reply(f'{worker.get_queue_size()} task(s) cancelled')
     await worker.clear_queue()
 
 
 @dp.message_handler(commands=['stat'])
 async def _(message: Message):
+    if not is_superuser(message.chat.id):
+        return
+
     await message.reply(f'statistics:\n'
                         f'transfer file(s): {worker.current_running_transfer_files}\n'
                         f'transfer size: {format_file_size(worker.current_running_transfer_size)}\n'
@@ -237,6 +246,9 @@ async def _(message: Message):
 
 @dp.message_handler(commands=['add_list'])
 async def _(message: Message):
+    if not is_superuser(message.chat.id):
+        return
+
     if not (playlist_id := get_playlist_id(message.get_args())):
         return
 
@@ -252,6 +264,9 @@ async def _(message: Message):
 
 @dp.message_handler(commands=['retry'])
 async def _(message: Message):
+    if not is_superuser(message.chat.id):
+        return
+
     count_urls = len(worker.current_running_retry_list)
 
     count_urls_filtered = await worker.add_task_batch(worker.current_running_retry_list, message.chat.id, message.message_id)
@@ -264,6 +279,9 @@ async def _(message: Message):
 
 @dp.message_handler(regexp=r'(?:v=|/)([0-9A-Za-z_-]{11}).*')
 async def _(message: Message):
+    if not is_superuser(message.chat.id):
+        return
+
     url = str(message.text)
     video_id = get_video_id(url)
 
