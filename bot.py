@@ -107,6 +107,18 @@ class VideoWorker(object):
         else:
             await self.reply('all tasks finished')
 
+    async def download_video(self, dm: DownloadManager) -> dict:
+        """download the video, return the video info"""
+        video_info = await self.loop.run_in_executor(None, dm.download_max_size_2000mb)
+
+        if (filesize := dm.file.stat().st_size) >= 2e9:
+            dm.file.unlink()
+            await self.reply(f'file too big: {format_file_size(filesize)}\ntry downloading smaller format')
+            video_info = await self.loop.run_in_executor(None, dm.download_max_size_1600mb)
+            # if this format is still too big, the video_id will be recorded in db with message_id = 0
+
+        return video_info
+
     async def upload_video(self, file: Path, video_info: dict) -> Message:
         """upload the video and its thumbnail"""
         with open(file, 'rb') as video:
@@ -126,6 +138,21 @@ class VideoWorker(object):
 
             return video_message
 
+    async def on_download_error(self, dm: DownloadManager, e: YoutubeDLError) -> None:
+        network_error_tokens = (
+            'The read operation timed out',
+            'Connection reset by peer',
+            'HTTP Error 503: Service Unavailable',
+            'The handshake operation timed out'
+        )
+
+        if any(token in e.msg for token in network_error_tokens):
+            self.current_running_retry_list.append(dm.url)
+            await self.reply(f'a network error occurs when upload this video: {dm.video_id}\n{e.msg}\n'
+                             f'this url has been saved to retry list, you can retry it later')
+        else:
+            await self.reply(f'error on uploading this video: {dm.video_id}\n{e.msg}\n')
+
     async def work(self) -> None:
         """main work loop"""
         while True:
@@ -140,19 +167,12 @@ class VideoWorker(object):
             self.is_working = True
 
             try:
-                video_info = await self.loop.run_in_executor(None, dm.download_max_size_2000mb)
-
-                if (filesize := dm.file.stat().st_size) >= 2e9:
-                    dm.file.unlink()
-                    await self.reply(f'file too big: {format_file_size(filesize)}\ntry downloading smaller format')
-                    video_info = await self.loop.run_in_executor(None, dm.download_max_size_1600mb)
-                    # if this format is still too big, the video_id will be recorded in db with message_id = 0
-
-                video_message_id = (await self.upload_video(dm.file, video_info)).message_id
+                video_info = await self.download_video(dm)
+                video_message = await self.upload_video(dm.file, video_info)
+                video_message_id = video_message.message_id
 
             except YoutubeDLError as e:
-                self.add_retry_link(url, e)
-                await self.reply(f'error on uploading this video: {dm.video_id}\n{e.msg}')
+                await self.on_download_error(dm, e)
 
             except Exception:  # noqa
                 await self.reply(f'error on uploading this video: {dm.video_id}\n{format_exc()}')
