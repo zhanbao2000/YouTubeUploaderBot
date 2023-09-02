@@ -227,7 +227,7 @@ async def _(message: Message):
 
 @dp.message_handler(commands=['stat'])
 async def _(message: Message):
-    await message.reply(f'statistic:\n'
+    await message.reply(f'statistics:\n'
                         f'transfer file(s): {worker.current_running_transfer_files}\n'
                         f'transfer size: {format_file_size(worker.current_running_transfer_size)}\n'
                         f'pending task(s): {worker.get_pending_tasks_count()}\n'
