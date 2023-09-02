@@ -7,7 +7,7 @@ from aiogram.bot.api import TelegramAPIServer
 from aiogram.types import BotCommand, Message, ParseMode
 from aiogram.types.base import Integer
 from aiogram.utils import executor
-from yt_dlp.utils import DownloadError
+from yt_dlp.utils import YoutubeDLError
 
 from config import BOT_TOKEN, PROXY, DOWNLOAD_ROOT, CHAT_ID
 from database import (
@@ -44,7 +44,7 @@ class VideoWorker(object):
         """return waiting tasks = queue size"""
         return self.video_queue.qsize()
 
-    def add_retry_link(self, url: str, e: DownloadError) -> bool:
+    def add_retry_link(self, url: str, e: YoutubeDLError) -> bool:
         """add a link to retry list if this link has network error"""
         network_error_tokens = (
             'The read operation timed out',
@@ -150,7 +150,7 @@ class VideoWorker(object):
 
                 video_message_id = (await self.upload_video(dm.file, video_info)).message_id
 
-            except DownloadError as e:
+            except YoutubeDLError as e:
                 self.add_retry_link(url, e)
                 await self.reply(f'error on uploading this video: {dm.video_id}\n{e.msg}')
 

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from yt_dlp import YoutubeDL
+from yt_dlp.utils import YoutubeDLError
 
 from config import DOWNLOAD_ROOT, GCP_APIKEY
 from utils import format_file_size, convert_date, get_client, escape_markdown
@@ -80,7 +81,7 @@ class DownloadManager(object):
                     all(format_.filesize == 0 for format_ in video_formats) or
                     all(format_.filesize == 0 for format_ in audio_formats)
             ):
-                raise RuntimeError('Inconclusive download format, please try again later.')
+                raise YoutubeDLError('Inconclusive download format, please try again later.')
 
             ydl.params.update({
                 'skip_download': False,
