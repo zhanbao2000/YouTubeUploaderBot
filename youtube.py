@@ -81,7 +81,7 @@ class DownloadManager(object):
                     all(format_.filesize == 0 for format_ in video_formats) or
                     all(format_.filesize == 0 for format_ in audio_formats)
             ):
-                raise YoutubeDLError('Inconclusive download format, please try again later.')
+                raise YoutubeDLError('Inconclusive download format.')
 
             ydl.params.update({
                 'skip_download': False,

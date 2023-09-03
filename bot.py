@@ -140,6 +140,7 @@ class VideoWorker(object):
 
     async def on_download_error(self, dm: DownloadManager, e: YoutubeDLError) -> None:
         """handle download error"""
+        text_retry = 'this url has been saved to retry list, you can retry it later'
         network_error_tokens = (
             'The read operation timed out',
             'Connection reset by peer',
@@ -149,8 +150,10 @@ class VideoWorker(object):
 
         if any(token in e.msg for token in network_error_tokens):
             self.current_running_retry_list.append(dm.url)
-            await self.reply(f'a network error occurs when upload this video: {dm.video_id}\n{e.msg}\n'
-                             f'this url has been saved to retry list, you can retry it later')
+            await self.reply(f'a network error occurs when upload this video: {dm.video_id}\n{e.msg}\n{text_retry}')
+        elif 'Inconclusive download format' in e.msg:
+            self.current_running_retry_list.append(dm.url)
+            await self.reply(f'this video currently only contains inconclusive formats: {dm.video_id}\n{e.msg}\n{text_retry}')
         else:
             await self.reply(f'error on uploading this video: {dm.video_id}\n{e.msg}\n')
 
