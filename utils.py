@@ -33,10 +33,12 @@ def escape_markdown(text: str):
 
 
 def is_superuser(chat_id: int) -> bool:
+    """check if a user is a superuser"""
     return chat_id in SUPERUSERS
 
 
 def get_client(proxies: Optional[str] = None, timeout: float = 15, retries: int = 5, **kwargs) -> AsyncClient:
+    """get a httpx client"""
     return AsyncClient(
         proxies=proxies,
         timeout=timeout,
