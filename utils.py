@@ -17,13 +17,13 @@ def create_message_link(chat_id: int, message_id: int) -> str:
     return f'https://t.me/c/{channel_id}/{message_id}'
 
 
-def format_file_size(size: int) -> str:
+def format_file_size(byte: int) -> str:
     """convert file size to human-readable format"""
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-        if size < 1024:
-            return f'{size:.2f}{unit}'
-        size /= 1024
-    return f'{size:.2f}PB'
+        if byte < 1024:
+            return f'{byte:.2f}{unit}'
+        byte /= 1024
+    return f'{byte:.2f}PB'
 
 
 def escape_markdown(text: str):
