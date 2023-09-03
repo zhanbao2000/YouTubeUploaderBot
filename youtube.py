@@ -12,20 +12,20 @@ from utils import format_file_size, convert_date, get_client, escape_markdown
 
 class Format(object):
 
-    def __init__(self, info: dict):
-        self.format_id: int = int(info.get('format_id'))
-        self.format_note: str = info.get('format_note')
-        self.filesize: int = info.get('filesize') or info.get('filesize_approx') or 0
-        self.bitrate: float = info.get('vbr') or info.get('tbr') or info.get('abr') or 0
+    def __init__(self, format_info: dict):
+        self.format_id: int = int(format_info.get('format_id'))
+        self.format_note: str = format_info.get('format_note')
+        self.filesize: int = format_info.get('filesize') or format_info.get('filesize_approx') or 0
+        self.bitrate: float = format_info.get('vbr') or format_info.get('tbr') or format_info.get('abr') or 0
 
 
 class VideoFormat(Format):
 
-    def __init__(self, info: dict):
-        super().__init__(info)
-        self.extension: str = info.get('video_ext')
-        self.resolution: str = info.get('resolution')
-        self.fps: float = info.get('fps') or 0
+    def __init__(self, format_info: dict):
+        super().__init__(format_info)
+        self.extension: str = format_info.get('video_ext')
+        self.resolution: str = format_info.get('resolution')
+        self.fps: float = format_info.get('fps') or 0
 
     def __str__(self) -> str:
         return (
@@ -38,9 +38,9 @@ class VideoFormat(Format):
 
 class AudioFormat(Format):
 
-    def __init__(self, info: dict):
-        super().__init__(info)
-        self.extension: str = info.get('audio_ext')
+    def __init__(self, format_info: dict):
+        super().__init__(format_info)
+        self.extension: str = format_info.get('audio_ext')
 
     def __str__(self) -> str:
         return (
@@ -71,10 +71,10 @@ class DownloadManager(object):
         }
 
     def _download(self, ydl_options: dict) -> dict:
-        """download the video and return the info dict"""
+        """download the video and return the video info"""
         with YoutubeDL(ydl_options) as ydl:
-            info_dict = ydl.extract_info(self.url, download=False)
-            video_formats, audio_formats = get_formats_list(info_dict['formats'])
+            video_info = ydl.extract_info(self.url, download=False)
+            video_formats, audio_formats = get_formats_list(video_info['formats'])
 
             # check if all formats have filesize == 0
             if (
@@ -88,7 +88,7 @@ class DownloadManager(object):
             })
             ydl.download([self.url])
 
-            return info_dict
+            return video_info
 
     def get_video_info(self) -> dict:
         """get video info directly without download the video"""
@@ -166,9 +166,9 @@ def get_playlist_id(url: str) -> Optional[str]:
     return match.group(0) if match else None
 
 
-def print_formats_list(info_dict: dict) -> None:
+def print_formats_list(video_info: dict) -> None:
     """print the formats list of the video"""
-    video_formats, audio_formats = get_formats_list(info_dict['formats'])
+    video_formats, audio_formats = get_formats_list(video_info['formats'])
 
     print('Video:')
     for video_format in video_formats:
@@ -184,13 +184,13 @@ def get_formats_list(formats: list[dict]) -> tuple[list[VideoFormat], list[Audio
     audio_formats = []
     video_formats = []
 
-    for info in formats:
-        if not info.get('format_id').isdigit():  # storyboards
+    for format_info in formats:
+        if not format_info.get('format_id').isdigit():  # storyboards
             continue
-        if 'video_ext' in info and info['video_ext'] != 'none' and 'format_note' in info:
-            video_formats.append(VideoFormat(info))
-        elif 'audio_ext' in info and info['audio_ext'] != 'none' and 'format_note' in info:
-            audio_formats.append(AudioFormat(info))
+        if 'video_ext' in format_info and format_info['video_ext'] != 'none' and 'format_note' in format_info:
+            video_formats.append(VideoFormat(format_info))
+        elif 'audio_ext' in format_info and format_info['audio_ext'] != 'none' and 'format_note' in format_info:
+            audio_formats.append(AudioFormat(format_info))
 
     return (
         sorted(video_formats, key=lambda x: x.bitrate, reverse=True),
