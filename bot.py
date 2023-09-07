@@ -147,10 +147,17 @@ class VideoWorker(object):
             'HTTP Error 503: Service Unavailable',
             'The handshake operation timed out'
         )
+        live_not_started_error_tokens = (
+            'Premieres in',
+            'This live event will begin in'
+        )
 
         if any(token in e.msg for token in network_error_tokens):
             self.current_running_retry_list.append(dm.url)
             await self.reply(f'a network error occurs when upload this video: {dm.video_id}\n{e.msg}\n{text_retry}')
+        elif any(token in e.msg for token in live_not_started_error_tokens):
+            self.current_running_retry_list.append(dm.url)
+            await self.reply(f'this live has not yet started: {dm.video_id}\n{e.msg}\n{text_retry}')
         elif 'Inconclusive download format' in e.msg:
             self.current_running_retry_list.append(dm.url)
             await self.reply(f'this video currently only contains inconclusive formats: {dm.video_id}\n{e.msg}\n{text_retry}')
