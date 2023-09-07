@@ -128,7 +128,6 @@ class VideoWorker(object):
     async def on_download_error(self, dm: DownloadManager, e: YoutubeDLError) -> None:
         """handle download error"""
         msg = escape_color(e.msg)
-        text_retry = 'this url has been saved to retry list, you can retry it later'
         network_error_tokens = (
             'The read operation timed out',
             'Connection reset by peer',
@@ -140,15 +139,18 @@ class VideoWorker(object):
             'This live event will begin in'
         )
 
+        retry_reason = ''
+
         if any(token in msg for token in network_error_tokens):
-            self.current_running_retry_list.append(dm.url)
-            await self.reply(f'{RetryReason.NETWORK_ERROR}: {dm.video_id}\n{msg}\n{text_retry}')
+            retry_reason = RetryReason.NETWORK_ERROR
         elif any(token in msg for token in live_not_started_error_tokens):
-            self.current_running_retry_list.append(dm.url)
-            await self.reply(f'{RetryReason.LIVE_NOT_STARTED}: {dm.video_id}\n{msg}\n{text_retry}')
+            retry_reason = RetryReason.LIVE_NOT_STARTED
         elif 'Inconclusive download format' in msg:
+            retry_reason = RetryReason.INCONCLUSIVE_FORMAT
+
+        if retry_reason:
             self.current_running_retry_list.append(dm.url)
-            await self.reply(f'{RetryReason.INCONCLUSIVE_FORMAT}: {dm.video_id}\n{msg}\n{text_retry}')
+            await self.reply(f'{retry_reason}: {dm.video_id}\n{msg}\nthis url has been saved to retry list, you can retry it later')
         else:
             await self.reply(f'error on uploading this video: {dm.video_id}\n{msg}\n')
 
