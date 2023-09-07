@@ -26,10 +26,15 @@ def format_file_size(byte: int) -> str:
     return f'{byte:.2f}PB'
 
 
-def escape_markdown(text: str):
+def escape_markdown(text: str) -> str:
     """escape markdown characters"""
     escape_chars = r'\*_\[\]()~`>#+-=|{}.!'
     return sub(r'([' + escape_chars + '])', r'\\\1', str(text))
+
+
+def escape_color(text: str) -> str:
+    """escape color codes"""
+    return sub(r'\x1b\[[0-9;]*m', '', text)
 
 
 def is_superuser(chat_id: int) -> bool:

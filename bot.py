@@ -14,8 +14,8 @@ from database import (
     insert_uploaded, is_in_database, is_available, update_available,
     get_db_size, get_all_video_ids, get_upload_message_id, get_unavailable_videos_count
 )
-from typedef import Task
-from utils import format_file_size, create_message_link, is_superuser
+from typedef import Task, RetryReason
+from utils import format_file_size, create_message_link, is_superuser, escape_color
 from youtube import (
     DownloadManager, is_video_available_online, get_video_caption,
     get_video_id, get_playlist_id, get_all_video_urls_from_playlist, get_thumbnail
@@ -127,6 +127,7 @@ class VideoWorker(object):
 
     async def on_download_error(self, dm: DownloadManager, e: YoutubeDLError) -> None:
         """handle download error"""
+        msg = escape_color(e.msg)
         text_retry = 'this url has been saved to retry list, you can retry it later'
         network_error_tokens = (
             'The read operation timed out',
@@ -139,17 +140,17 @@ class VideoWorker(object):
             'This live event will begin in'
         )
 
-        if any(token in e.msg for token in network_error_tokens):
+        if any(token in msg for token in network_error_tokens):
             self.current_running_retry_list.append(dm.url)
-            await self.reply(f'a network error occurs when upload this video: {dm.video_id}\n{e.msg}\n{text_retry}')
-        elif any(token in e.msg for token in live_not_started_error_tokens):
+            await self.reply(f'{RetryReason.NETWORK_ERROR}: {dm.video_id}\n{msg}\n{text_retry}')
+        elif any(token in msg for token in live_not_started_error_tokens):
             self.current_running_retry_list.append(dm.url)
-            await self.reply(f'this live has not yet started: {dm.video_id}\n{e.msg}\n{text_retry}')
-        elif 'Inconclusive download format' in e.msg:
+            await self.reply(f'{RetryReason.LIVE_NOT_STARTED}: {dm.video_id}\n{msg}\n{text_retry}')
+        elif 'Inconclusive download format' in msg:
             self.current_running_retry_list.append(dm.url)
-            await self.reply(f'this video currently only contains inconclusive formats: {dm.video_id}\n{e.msg}\n{text_retry}')
+            await self.reply(f'{RetryReason.INCONCLUSIVE_FORMAT}: {dm.video_id}\n{msg}\n{text_retry}')
         else:
-            await self.reply(f'error on uploading this video: {dm.video_id}\n{e.msg}\n')
+            await self.reply(f'error on uploading this video: {dm.video_id}\n{msg}\n')
 
     async def work(self) -> None:
         """main work loop"""
