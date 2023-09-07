@@ -45,20 +45,6 @@ class VideoWorker(object):
         """return waiting tasks = queue size"""
         return self.video_queue.qsize()
 
-    def add_retry_link(self, url: str, e: YoutubeDLError) -> bool:
-        """add a link to retry list if this link has network error"""
-        network_error_tokens = (
-            'The read operation timed out',
-            'Connection reset by peer',
-            'HTTP Error 503: Service Unavailable',
-            'The handshake operation timed out'
-        )
-
-        if any(token in e.msg for token in network_error_tokens):
-            self.current_running_retry_list.append(url)
-            return True
-        return False
-
     async def add_task(self, task: Task) -> None:
         """add a new task"""
         await self.video_queue.put(task)
