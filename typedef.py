@@ -10,5 +10,5 @@ class RetryReason(str, Enum):
 
 class Task(NamedTuple):
     url: str
-    chat_id: str
-    message_id: str
+    chat_id: int
+    message_id: int
