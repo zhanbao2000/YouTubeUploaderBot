@@ -34,7 +34,7 @@ class VideoWorker(object):
         self.current_task = None
         self.current_running_transfer_files = 0  # total files transferred from startup
         self.current_running_transfer_size = 0  # total size transferred from startup
-        self.current_running_retry_list: list[str] = []  # save links with download error (only network error)
+        self.current_running_retry_list: list[str] = []  # save links with download error
 
     def get_pending_tasks_count(self) -> int:
         """return pending tasks = waiting + current"""
