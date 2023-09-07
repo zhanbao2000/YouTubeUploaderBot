@@ -14,6 +14,7 @@ from database import (
     insert_uploaded, is_in_database, is_available, update_available,
     get_db_size, get_all_video_ids, get_upload_message_id, get_unavailable_videos_count
 )
+from typedef import Task
 from utils import format_file_size, create_message_link, is_superuser
 from youtube import (
     DownloadManager, is_video_available_online, get_video_caption,
@@ -29,7 +30,7 @@ class VideoWorker(object):
     def __init__(self, loop: AbstractEventLoop):
         self.is_working = False
         self.loop = loop
-        self.video_queue = Queue()
+        self.video_queue: Queue[Task] = Queue()
         self.current_chat_id = None  # the chat which triggered this task, for replying
         self.current_message_id = None  # the message which triggered this task, for replying
         self.current_running_transfer_files = 0  # total files transferred from startup
@@ -58,9 +59,9 @@ class VideoWorker(object):
             return True
         return False
 
-    async def add_task(self, url: str, chat_id: Integer, message_id: Integer) -> None:
+    async def add_task(self, task: Task) -> None:
         """add a new task"""
-        await self.video_queue.put((url, chat_id, message_id))
+        await self.video_queue.put(task)
 
     async def add_task_batch(self, url_list: list[str], chat_id: Integer, message_id: Integer) -> int:
         """add many new tasks"""
@@ -70,7 +71,7 @@ class VideoWorker(object):
             if is_in_database(get_video_id(url)):
                 continue
 
-            await self.video_queue.put((url, chat_id, message_id))
+            await self.video_queue.put(Task(url, chat_id, message_id))
             count_task_added += 1
 
         return count_task_added
@@ -167,9 +168,11 @@ class VideoWorker(object):
     async def work(self) -> None:
         """main work loop"""
         while True:
-            url, self.current_chat_id, self.current_message_id = await self.video_queue.get()
+            task = await self.video_queue.get()
+            self.current_chat_id = task.chat_id
+            self.current_message_id = task.message_id
             video_message_id = None
-            dm = DownloadManager(url)
+            dm = DownloadManager(task.url)
 
             if is_in_database(dm.video_id):
                 await self.reply_duplicate(dm.video_id)
@@ -327,7 +330,7 @@ async def _(message: Message):
 
         return
 
-    await worker.add_task(url, message.chat.id, message.message_id)
+    await worker.add_task(Task(url, message.chat.id, message.message_id))
     await message.reply(f'task added\ntotal task(s): {worker.get_pending_tasks_count()}')
 
 
