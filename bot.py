@@ -48,10 +48,10 @@ class VideoWorker(object):
         """add a new task"""
         await self.video_queue.put(task)
 
-    async def add_task_batch(self, url_list: list[str], chat_id: Integer, message_id: Integer) -> int:
+    async def add_task_batch(self, urls: list[str], chat_id: Integer, message_id: Integer) -> int:
         """add many new tasks"""
         count_task_added = 0
-        for url in url_list:
+        for url in urls:
 
             if is_in_database(get_video_id(url)):
                 continue
