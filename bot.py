@@ -31,8 +31,7 @@ class VideoWorker(object):
         self.is_working = False
         self.loop = loop
         self.video_queue: Queue[Task] = Queue()
-        self.current_chat_id = None  # the chat which triggered this task, for replying
-        self.current_message_id = None  # the message which triggered this task, for replying
+        self.current_task = None
         self.current_running_transfer_files = 0  # total files transferred from startup
         self.current_running_transfer_size = 0  # total size transferred from startup
         self.current_running_retry_list: list[str] = []  # save links with download error (only network error)
@@ -64,7 +63,12 @@ class VideoWorker(object):
 
     async def reply(self, text: str, **kwargs) -> Message:
         """reply to the message which triggered current task"""
-        return await bot.send_message(chat_id=self.current_chat_id, reply_to_message_id=self.current_message_id, text=text, **kwargs)
+        return await bot.send_message(
+            chat_id=self.current_task.chat_id,
+            reply_to_message_id=self.current_task.message_id,
+            text=text,
+            **kwargs
+        )
 
     async def clear_download_folder(self) -> None:
         """clear the download folder and reply to the user"""
@@ -157,11 +161,9 @@ class VideoWorker(object):
     async def work(self) -> None:
         """main work loop"""
         while True:
-            task = await self.video_queue.get()
-            self.current_chat_id = task.chat_id
-            self.current_message_id = task.message_id
+            self.current_task = await self.video_queue.get()
             video_message_id = None
-            dm = DownloadManager(task.url)
+            dm = DownloadManager(self.current_task.url)
 
             if is_in_database(dm.video_id):
                 await self.reply_duplicate(dm.video_id)
