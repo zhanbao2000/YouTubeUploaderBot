@@ -1,6 +1,7 @@
 from asyncio import Queue, get_event_loop, QueueEmpty, AbstractEventLoop
 from pathlib import Path
 from traceback import format_exc
+from typing import Iterable, Optional
 
 from aiogram import Bot, Dispatcher
 from aiogram.bot.api import TelegramAPIServer
@@ -31,10 +32,10 @@ class VideoWorker(object):
         self.is_working = False
         self.loop = loop
         self.video_queue: Queue[Task] = Queue()
-        self.current_task = None
+        self.current_task = Optional[Task]
         self.current_running_transfer_files = 0  # total files transferred from startup
         self.current_running_transfer_size = 0  # total size transferred from startup
-        self.current_running_retry_list: list[str] = []  # save links with download error
+        self.current_running_retry_list: set[str] = set()  # save links with download error
 
     def get_pending_tasks_count(self) -> int:
         """return pending tasks = waiting + current"""
@@ -48,7 +49,7 @@ class VideoWorker(object):
         """add a new task"""
         await self.video_queue.put(task)
 
-    async def add_task_batch(self, urls: list[str], chat_id: Integer, message_id: Integer) -> int:
+    async def add_task_batch(self, urls: Iterable[str], chat_id: Integer, message_id: Integer) -> int:
         """add many new tasks"""
         count_task_added = 0
         for url in urls:
@@ -153,7 +154,7 @@ class VideoWorker(object):
             retry_reason = RetryReason.INCONCLUSIVE_FORMAT
 
         if retry_reason:
-            self.current_running_retry_list.append(dm.url)
+            self.current_running_retry_list.add(dm.url)
             await self.reply(f'{retry_reason}: {dm.video_id}\n{msg}\nthis url has been saved to retry list, you can retry it later')
         else:
             await self.reply(f'error on uploading this video: {dm.video_id}\n{msg}\n')
