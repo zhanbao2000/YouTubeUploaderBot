@@ -247,13 +247,15 @@ async def _(message: Message):
                         f'🔴 -> 🟢: {count_become_available}')
 
 
-@dp.message_handler(commands=['cancel'])
+@dp.message_handler(commands=['clear'])
 async def _(message: Message):
     if not is_superuser(message.chat.id):
         return
 
-    await message.reply(f'{worker.get_queue_size()} task(s) cancelled')
+    await message.reply(f'{worker.get_queue_size()} pending task(s) cancelled\n'
+                        f'{len(worker.current_running_retry_list)} retry task(s) cancelled')
     await worker.clear_queue()
+    worker.current_running_retry_list.clear()
 
 
 @dp.message_handler(commands=['stat'])
@@ -329,7 +331,7 @@ async def on_startup(dp_: Dispatcher) -> None:
     await dp_.bot.set_my_commands([
         BotCommand('start', 'hello'),
         BotCommand('check', 'check all videos whether they are still available'),
-        BotCommand('cancel', 'cancel all waiting tasks'),
+        BotCommand('clear', 'clear both retry and pending tasks'),
         BotCommand('stat', 'show statistics'),
         BotCommand('add_list', 'add all videos in a playlist'),
         BotCommand('retry', 'retry all videos with network error'),
