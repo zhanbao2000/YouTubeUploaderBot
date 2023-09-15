@@ -17,6 +17,11 @@ def create_message_link(chat_id: int, message_id: int) -> str:
     return f'https://t.me/c/{channel_id}/{message_id}'
 
 
+def create_video_link(video_id: str) -> str:
+    """create a video link according to video id"""
+    return f'https://www.youtube.com/watch?v={video_id}'
+
+
 def format_file_size(byte: int) -> str:
     """convert file size to human-readable format"""
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:

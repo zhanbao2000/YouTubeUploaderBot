@@ -7,7 +7,7 @@ from yt_dlp import YoutubeDL
 from yt_dlp.utils import YoutubeDLError
 
 from config import DOWNLOAD_ROOT, GCP_APIKEY
-from utils import format_file_size, convert_date, get_client, escape_markdown
+from utils import format_file_size, convert_date, get_client, escape_markdown, create_video_link
 
 
 class Format(object):
@@ -247,3 +247,27 @@ async def get_all_video_urls_from_playlist(playlist_id) -> list[str]:
                 break
 
     return result
+
+
+async def get_all_stream_urls_from_holoinfo(limit: int = 100, max_upcoming_hours: int = -1) -> list[str]:
+    """get all video urls from holoinfo"""
+    api_url = 'https://holoinfo.me/dex/videos'
+    params = {
+        'status': 'past',
+        'type': 'stream',
+        'topic': 'asmr',
+        'limit': limit,
+        'max_upcoming_hours': max_upcoming_hours,
+    }
+    headers = {
+        'User-Agent': 'YouTubeUploaderBot/1.0 (contact: https://github.com/zhanbao2000/YouTubeUploaderBot)',
+        'Sec-Fetch-Site': 'same-origin'
+    }
+
+    async with get_client() as client:
+        r = await client.get(api_url, headers=headers, params=params)
+
+        if r.status_code != 200:
+            return []
+
+    return [create_video_link(video_info['id']) for video_info in r.json()]

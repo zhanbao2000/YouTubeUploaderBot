@@ -14,7 +14,10 @@ from database import (
 from typedef import Task
 from utils import format_file_size, create_message_link, is_superuser
 from worker import VideoWorker
-from youtube import is_video_available_online, get_video_id, get_playlist_id, get_all_video_urls_from_playlist
+from youtube import (
+    is_video_available_online, get_video_id, get_playlist_id,
+    get_all_video_urls_from_playlist, get_all_stream_urls_from_holoinfo
+)
 
 local_server = TelegramAPIServer.from_base('http://localhost:8083')
 bot = Bot(token=BOT_TOKEN, proxy=PROXY, server=local_server)
@@ -114,6 +117,21 @@ async def _(message: Message):
                         f'{count_urls_filtered} task(s) added')
 
 
+@dp.message_handler(commands=['add_holoinfo'])
+async def _(message: Message):
+    if not is_superuser(message.chat.id):
+        return
+
+    video_urls = await get_all_stream_urls_from_holoinfo()
+    count_urls = len(video_urls)
+
+    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.message_id)
+
+    await message.reply(f'{count_urls} video(s) fetched from holoinfo\n'
+                        f'{count_urls - count_urls_filtered} video(s) skipped\n'
+                        f'{count_urls_filtered} task(s) added')
+
+
 @dp.message_handler(commands=['retry'])
 async def _(message: Message):
     if not is_superuser(message.chat.id):
@@ -158,6 +176,7 @@ async def on_startup(dp_: Dispatcher) -> None:
         BotCommand('clear', 'clear both retry and pending tasks'),
         BotCommand('stat', 'show statistics'),
         BotCommand('add_list', 'add all videos in a playlist'),
+        BotCommand('add_holoinfo', 'add 100 videos from holoinfo'),
         BotCommand('retry', 'retry all videos with network error'),
     ])
 
