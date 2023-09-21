@@ -219,6 +219,27 @@ async def is_video_available_online(video_id: str) -> bool:
     return 'items' in video_info and len(video_info['items']) > 0
 
 
+async def is_video_available_online_batch(video_ids: set[str]) -> dict[str, bool]:
+    """check if a list of videos are available"""
+    if len(video_ids) > 50:
+        raise ValueError('The number of video IDs should not exceed 50.')
+
+    video_params = {
+        'part': 'snippet,statistics',
+        'id': ','.join(video_ids),
+        'key': GCP_APIKEY
+    }
+    async with get_client() as client:
+        resp = await client.get('https://youtube.googleapis.com/youtube/v3/videos', params=video_params)
+        video_info = resp.json()
+
+    result = {video_id: False for video_id in video_ids}
+    for video in video_info.get('items', []):
+        result[video['id']] = 'snippet' in video
+
+    return result
+
+
 async def get_all_video_urls_from_playlist(playlist_id) -> list[str]:
     """get all video urls from a playlist"""
     api_url = 'https://www.googleapis.com/youtube/v3/playlistItems'

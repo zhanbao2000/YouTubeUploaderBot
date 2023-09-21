@@ -15,7 +15,7 @@ from typedef import Task
 from utils import format_file_size, create_message_link, is_superuser
 from worker import VideoWorker
 from youtube import (
-    is_video_available_online, get_video_id, get_playlist_id,
+    is_video_available_online_batch, get_video_id, get_playlist_id,
     get_all_video_urls_from_playlist, get_all_stream_urls_from_holoinfo
 )
 
@@ -30,7 +30,7 @@ async def _(message: Message):
 
 
 @dp.message_handler(commands=['check'])
-async def _(message: Message):
+async def _(message: Message):  # TODO: Refactor this function to reduce its Cognitive Complexity from 19 to the 15 allowed.
     if not is_superuser(message.chat.id):
         return
 
@@ -43,28 +43,31 @@ async def _(message: Message):
 
     await message.reply(f'start checking, task(s): {count_all}')
 
-    for count_progress, video_id in enumerate(video_ids, start=1):
+    for start in range(0, count_all, 50):
+        batch_video_ids = video_ids[start:start + 50]
+        batch_availability = await is_video_available_online_batch(set(batch_video_ids))
+        for count_progress, video_id in enumerate(batch_video_ids, start=1):
 
-        if count_progress % 100 == 0:
-            await message.reply(f'progress: {count_progress}/{count_all}')
+            if (start + count_progress) % 1000 == 0:
+                await message.reply(f'progress: {start + count_progress}/{count_all}')
 
-        if not await is_video_available_online(video_id):
-            count_all_not_available += 1
+            if not batch_availability[video_id]:  # unavailable online
+                count_all_not_available += 1
 
-            if is_available(video_id):
-                count_become_not_available += 1
-                update_available(video_id, False)
-                message_link = create_message_link(CHAT_ID, get_upload_message_id(video_id))
-                await message.reply(f'detected new unavailable video: [{video_id}]({message_link})', parse_mode='Markdown')
+                if is_available(video_id):
+                    count_become_not_available += 1
+                    update_available(video_id, False)
+                    message_link = create_message_link(CHAT_ID, get_upload_message_id(video_id))
+                    await message.reply(f'detected new unavailable video: [{video_id}]({message_link})', parse_mode='Markdown')
 
-        else:  # available online
-            count_all_available += 1
+            else:  # available online
+                count_all_available += 1
 
-            if not is_available(video_id):
-                count_become_available += 1
-                update_available(video_id, True)
-                message_link = create_message_link(CHAT_ID, get_upload_message_id(video_id))
-                await message.reply(f'detected a video is available again: [{video_id}]({message_link})', parse_mode='Markdown')
+                if not is_available(video_id):
+                    count_become_available += 1
+                    update_available(video_id, True)
+                    message_link = create_message_link(CHAT_ID, get_upload_message_id(video_id))
+                    await message.reply(f'detected a video is available again: [{video_id}]({message_link})', parse_mode='Markdown')
 
     await message.reply(f'all checking tasks finished\n'
                         f'total videos: {count_all}\n'
