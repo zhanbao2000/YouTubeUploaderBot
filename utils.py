@@ -1,6 +1,8 @@
+from functools import wraps
 from re import sub
 from typing import Optional
 
+from aiogram.types import Message
 from httpx import AsyncClient, AsyncHTTPTransport
 
 from config import SUPERUSERS
@@ -42,9 +44,13 @@ def escape_color(text: str) -> str:
     return sub(r'\x1b\[[0-9;]*m', '', text)
 
 
-def is_superuser(chat_id: int) -> bool:
-    """check if a user is a superuser"""
-    return chat_id in SUPERUSERS
+def superuser_required(func):
+    @wraps(func)
+    async def wrapper(message: Message, *args, **kwargs):
+        if message.chat.id in SUPERUSERS:
+            return await func(message, *args, **kwargs)
+
+    return wrapper
 
 
 def get_client(proxies: Optional[str] = None, timeout: float = 15, retries: int = 5, **kwargs) -> AsyncClient:

@@ -12,7 +12,7 @@ from database import (
     get_db_size, get_all_video_ids, get_upload_message_id, get_unavailable_videos_count
 )
 from typedef import Task
-from utils import format_file_size, create_message_link, is_superuser
+from utils import format_file_size, create_message_link, superuser_required
 from worker import VideoWorker
 from youtube import (
     is_video_available_online_batch, get_video_id, get_playlist_id,
@@ -30,10 +30,8 @@ async def _(message: Message):
 
 
 @dp.message_handler(commands=['check'])
+@superuser_required
 async def _(message: Message):  # TODO: Refactor this function to reduce its Cognitive Complexity from 19 to the 15 allowed.
-    if not is_superuser(message.chat.id):
-        return
-
     video_ids = get_all_video_ids()
     count_all = len(video_ids)
     count_become_available = 0
@@ -78,10 +76,8 @@ async def _(message: Message):  # TODO: Refactor this function to reduce its Cog
 
 
 @dp.message_handler(commands=['clear'])
+@superuser_required
 async def _(message: Message):
-    if not is_superuser(message.chat.id):
-        return
-
     await message.reply(f'{worker.get_queue_size()} pending task(s) cancelled\n'
                         f'{len(worker.current_running_retry_list)} retry task(s) cancelled')
     await worker.clear_queue()
@@ -89,10 +85,8 @@ async def _(message: Message):
 
 
 @dp.message_handler(commands=['stat'])
+@superuser_required
 async def _(message: Message):
-    if not is_superuser(message.chat.id):
-        return
-
     await message.reply(f'statistics:\n'
                         f'transfer file(s): {worker.current_running_transfer_files}\n'
                         f'transfer size: {format_file_size(worker.current_running_transfer_size)}\n'
@@ -103,10 +97,8 @@ async def _(message: Message):
 
 
 @dp.message_handler(commands=['add_list'])
+@superuser_required
 async def _(message: Message):
-    if not is_superuser(message.chat.id):
-        return
-
     if not (playlist_id := get_playlist_id(message.get_args())):
         return
 
@@ -121,10 +113,8 @@ async def _(message: Message):
 
 
 @dp.message_handler(commands=['add_holoinfo'])
+@superuser_required
 async def _(message: Message):
-    if not is_superuser(message.chat.id):
-        return
-
     video_urls = await get_all_stream_urls_from_holoinfo()
     count_urls = len(video_urls)
 
@@ -136,10 +126,8 @@ async def _(message: Message):
 
 
 @dp.message_handler(commands=['retry'])
+@superuser_required
 async def _(message: Message):
-    if not is_superuser(message.chat.id):
-        return
-
     count_urls = len(worker.current_running_retry_list)
 
     count_urls_filtered = await worker.add_task_batch(worker.current_running_retry_list, message.chat.id, message.message_id)
@@ -151,10 +139,8 @@ async def _(message: Message):
 
 
 @dp.message_handler(regexp=r'(?:v=|/)([0-9A-Za-z_-]{11}).*')
+@superuser_required
 async def _(message: Message):
-    if not is_superuser(message.chat.id):
-        return
-
     url = str(message.text)
     video_id = get_video_id(url)
 
