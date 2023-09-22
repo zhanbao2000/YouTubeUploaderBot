@@ -199,17 +199,17 @@ class VideoChecker(object):
         self.count_all_available = 0
         self.count_all_unavailable = 0
 
-    async def handle_become_available(self, video_id: str):
+    async def handle_become_available(self, video_id: str) -> None:
         self.count_become_available += 1
         update_available(video_id, True)
         await self.reply_change(video_id, 'detected a video is available again')
 
-    async def handle_become_not_available(self, video_id: str):
+    async def handle_become_not_available(self, video_id: str) -> None:
         self.count_become_unavailable += 1
         update_available(video_id, False)
         await self.reply_change(video_id, 'detected new unavailable video')
 
-    async def reply_change(self, video_id: str, text: str):
+    async def reply_change(self, video_id: str, text: str) -> None:
         message_link = create_message_link(CHAT_ID, get_upload_message_id(video_id))
         await self.message.reply(f'{text}: [{video_id}]({message_link})', parse_mode='Markdown')
 
@@ -218,7 +218,7 @@ class VideoChecker(object):
         if self.count_progress % 1000 == 0:
             await self.message.reply(f'progress: {self.count_progress}/{self.count_all}')
 
-    async def check_video(self, video_id: str, video_available_online: bool, video_available_local: bool):
+    async def check_video(self, video_id: str, video_available_online: bool, video_available_local: bool) -> None:
         if video_available_online:
             self.count_all_available += 1
         else:
@@ -229,7 +229,7 @@ class VideoChecker(object):
         elif not video_available_online and video_available_local:
             await self.handle_become_not_available(video_id)
 
-    async def check_videos(self):
+    async def check_videos(self) -> None:
         for batch_video_ids in slide_window(self.video_ids, 50):
             batch_availability = await is_video_available_online_batch(batch_video_ids)
 
