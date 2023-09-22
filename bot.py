@@ -7,17 +7,11 @@ from aiogram.types import BotCommand, Message
 from aiogram.utils import executor
 
 from config import BOT_TOKEN, PROXY, DOWNLOAD_ROOT, CHAT_ID
-from database import (
-    is_in_database, is_available, update_available,
-    get_db_size, get_all_video_ids, get_upload_message_id, get_unavailable_videos_count
-)
+from database import is_in_database, get_db_size, get_upload_message_id, get_unavailable_videos_count
 from typedef import Task
 from utils import format_file_size, create_message_link, superuser_required
-from worker import VideoWorker
-from youtube import (
-    is_video_available_online_batch, get_video_id, get_playlist_id,
-    get_all_video_urls_from_playlist, get_all_stream_urls_from_holoinfo
-)
+from worker import VideoWorker, VideoChecker
+from youtube import get_video_id, get_playlist_id, get_all_video_urls_from_playlist, get_all_stream_urls_from_holoinfo
 
 local_server = TelegramAPIServer.from_base('http://localhost:8083')
 bot = Bot(token=BOT_TOKEN, proxy=PROXY, server=local_server)
@@ -31,48 +25,16 @@ async def _(message: Message):
 
 @dp.message_handler(commands=['check'])
 @superuser_required
-async def _(message: Message):  # TODO: Refactor this function to reduce its Cognitive Complexity from 19 to the 15 allowed.
-    video_ids = get_all_video_ids()
-    count_all = len(video_ids)
-    count_become_available = 0
-    count_become_not_available = 0
-    count_all_available = 0
-    count_all_not_available = 0
-
-    await message.reply(f'start checking, task(s): {count_all}')
-
-    for start in range(0, count_all, 50):
-        batch_video_ids = video_ids[start:start + 50]
-        batch_availability = await is_video_available_online_batch(set(batch_video_ids))
-        for count_progress, video_id in enumerate(batch_video_ids, start=1):
-
-            if (start + count_progress) % 1000 == 0:
-                await message.reply(f'progress: {start + count_progress}/{count_all}')
-
-            if not batch_availability[video_id]:  # unavailable online
-                count_all_not_available += 1
-
-                if is_available(video_id):
-                    count_become_not_available += 1
-                    update_available(video_id, False)
-                    message_link = create_message_link(CHAT_ID, get_upload_message_id(video_id))
-                    await message.reply(f'detected new unavailable video: [{video_id}]({message_link})', parse_mode='Markdown')
-
-            else:  # available online
-                count_all_available += 1
-
-                if not is_available(video_id):
-                    count_become_available += 1
-                    update_available(video_id, True)
-                    message_link = create_message_link(CHAT_ID, get_upload_message_id(video_id))
-                    await message.reply(f'detected a video is available again: [{video_id}]({message_link})', parse_mode='Markdown')
-
+async def _(message: Message):
+    checker = VideoChecker(message)
+    await message.reply(f'start checking, task(s): {checker.count_all}')
+    await checker.check_videos()
     await message.reply(f'all checking tasks finished\n'
-                        f'total videos: {count_all}\n'
-                        f'total 🟢: {count_all_available}\n'
-                        f'total 🔴: {count_all_not_available}\n'
-                        f'🟢 -> 🔴: {count_become_not_available}\n'
-                        f'🔴 -> 🟢: {count_become_available}')
+                        f'total videos: {checker.count_all}\n'
+                        f'total 🟢: {checker.count_all_available}\n'
+                        f'total 🔴: {checker.count_all_unavailable}\n'
+                        f'🟢 -> 🔴: {checker.count_become_unavailable}\n'
+                        f'🔴 -> 🟢: {checker.count_become_available}')
 
 
 @dp.message_handler(commands=['clear'])

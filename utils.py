@@ -53,6 +53,12 @@ def superuser_required(func):
     return wrapper
 
 
+def slide_window(lst: list, window_size: int):
+    """generator function that yields window_size elements at a time"""
+    for start in range(0, len(lst), window_size):
+        yield lst[start:start + window_size]
+
+
 def get_client(proxies: Optional[str] = None, timeout: float = 15, retries: int = 5, **kwargs) -> AsyncClient:
     """get a httpx client"""
     return AsyncClient(

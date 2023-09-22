@@ -219,7 +219,7 @@ async def is_video_available_online(video_id: str) -> bool:
     return 'items' in video_info and len(video_info['items']) > 0
 
 
-async def is_video_available_online_batch(video_ids: set[str]) -> dict[str, bool]:
+async def is_video_available_online_batch(video_ids: list[str]) -> dict[str, bool]:
     """check if a list of videos are available"""
     if len(video_ids) > 50:
         raise ValueError('The number of video IDs should not exceed 50.')

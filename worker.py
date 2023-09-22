@@ -9,10 +9,10 @@ from aiogram.types.base import Integer
 from yt_dlp.utils import YoutubeDLError
 
 from config import DOWNLOAD_ROOT, CHAT_ID
-from database import insert_uploaded, is_in_database, get_upload_message_id
+from database import insert_uploaded, is_in_database, get_upload_message_id, update_available, is_available, get_all_video_ids
 from typedef import Task, RetryReason
-from utils import format_file_size, create_message_link, escape_color
-from youtube import DownloadManager, get_video_caption, get_video_id, get_thumbnail
+from utils import format_file_size, create_message_link, escape_color, slide_window
+from youtube import DownloadManager, get_video_caption, get_video_id, get_thumbnail, is_video_available_online_batch
 
 
 class VideoWorker(object):
@@ -185,3 +185,57 @@ class VideoWorker(object):
                 await self.clear_download_folder()
                 self.is_working = False
                 self.video_queue.task_done()
+
+
+class VideoChecker(object):
+    def __init__(self, message: Message):
+        self.message = message
+        self.video_ids = get_all_video_ids()
+
+        self.count_all = len(self.video_ids)
+        self.count_progress = 0
+        self.count_become_available = 0
+        self.count_become_unavailable = 0
+        self.count_all_available = 0
+        self.count_all_unavailable = 0
+
+    async def handle_become_available(self, video_id: str):
+        self.count_become_available += 1
+        update_available(video_id, True)
+        await self.reply_change(video_id, 'detected a video is available again')
+
+    async def handle_become_not_available(self, video_id: str):
+        self.count_become_unavailable += 1
+        update_available(video_id, False)
+        await self.reply_change(video_id, 'detected new unavailable video')
+
+    async def reply_change(self, video_id: str, text: str):
+        message_link = create_message_link(CHAT_ID, get_upload_message_id(video_id))
+        await self.message.reply(f'{text}: [{video_id}]({message_link})', parse_mode='Markdown')
+
+    async def check_progress(self) -> None:
+        self.count_progress += 1
+        if self.count_progress % 1000 == 0:
+            await self.message.reply(f'progress: {self.count_progress}/{self.count_all}')
+
+    async def check_video(self, video_id: str, video_available_online: bool, video_available_local: bool):
+        if video_available_online:
+            self.count_all_available += 1
+        else:
+            self.count_all_unavailable += 1
+
+        if video_available_online and not video_available_local:
+            await self.handle_become_available(video_id)
+        elif not video_available_online and video_available_local:
+            await self.handle_become_not_available(video_id)
+
+    async def check_videos(self):
+        for batch_video_ids in slide_window(self.video_ids, 50):
+            batch_availability = await is_video_available_online_batch(batch_video_ids)
+
+            for video_id in batch_video_ids:
+                video_available_online = batch_availability[video_id]
+                video_available_local = is_available(video_id)
+
+                await self.check_progress()
+                await self.check_video(video_id, video_available_online, video_available_local)
