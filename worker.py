@@ -1,4 +1,4 @@
-from asyncio import Queue, QueueEmpty, AbstractEventLoop
+from asyncio import Queue, QueueEmpty, AbstractEventLoop, sleep
 from pathlib import Path
 from traceback import format_exc
 from typing import Iterable, Optional
@@ -108,6 +108,7 @@ class VideoWorker(object):
                 supports_streaming=True, duration=video_info['duration'],
                 width=video_info['width'], height=video_info['height']
             )
+            await sleep(1)  # avoid 429, see: https://telegra.ph/So-your-bot-is-rate-limited-01-26
             await self.bot.send_photo(
                 chat_id=CHAT_ID, photo=await get_thumbnail(video_info['thumbnail']),
                 caption=get_video_caption(video_info), parse_mode=ParseMode.MARKDOWN_V2,
