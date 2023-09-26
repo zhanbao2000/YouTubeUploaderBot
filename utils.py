@@ -5,7 +5,7 @@ from typing import Optional
 from aiogram.types import Message
 from httpx import AsyncClient, AsyncHTTPTransport
 
-from config import SUPERUSERS
+from config import SUPERUSERS, PROXY
 
 
 def convert_date(date: str) -> str:
@@ -62,7 +62,7 @@ def slide_window(lst: list, window_size: int):
 def get_client(proxies: Optional[str] = None, timeout: float = 15, retries: int = 5, **kwargs) -> AsyncClient:
     """get a httpx client"""
     return AsyncClient(
-        proxies=proxies,
+        proxies=proxies or PROXY,
         timeout=timeout,
         transport=AsyncHTTPTransport(retries=retries) if retries else None,
         **kwargs
