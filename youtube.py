@@ -1,12 +1,13 @@
 import re
 from io import BytesIO
 from pathlib import Path
+from time import time
 from typing import Optional
 
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import YoutubeDLError
 
-from config import DOWNLOAD_ROOT, GCP_APIKEY
+from config import DOWNLOAD_ROOT, GCP_APIKEY, CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN
 from utils import format_file_size, convert_date, get_client, escape_markdown, create_video_link
 
 
@@ -122,6 +123,34 @@ class DownloadManager(object):
         })
 
         return self._download(ydl_options)
+
+
+class YouTubeOAuth20Provider(object):
+
+    def __init__(self):
+        self.access_token = ''
+        self.expire_at = 0.
+
+    async def refresh_token(self) -> None:
+        """refresh OAuth 2.0 token"""
+        params = {
+            'grant_type': 'refresh_token',
+            'client_id': CLIENT_ID,
+            'client_secret': CLIENT_SECRET,
+            'refresh_token': REFRESH_TOKEN
+        }
+        async with get_client() as client:
+            resp = await client.post('https://oauth2.googleapis.com/token', data=params)
+            resp_dict = resp.json()
+
+        self.access_token = resp_dict['access_token']
+        self.expire_at = time() + resp_dict['expires_in']
+
+    async def get_access_token_safe(self) -> str:
+        """get access token ensure it is available"""
+        if not self.access_token or time() >= self.expire_at:
+            await self.refresh_token()
+        return self.access_token
 
 
 def get_video_caption(video_info: dict) -> str:
@@ -269,6 +298,78 @@ async def get_all_video_urls_from_playlist(playlist_id) -> list[str]:
     return result
 
 
+async def get_all_my_subscription_channel_ids() -> list[str]:
+    """get all channel ids of my subscriptions"""
+    params = {
+        'part': 'snippet',
+        'mine': True,
+        'maxResults': 50,
+        'key': GCP_APIKEY,
+    }
+    headers = {
+        'Authorization': f'Bearer {await access_token_provider.get_access_token_safe()}',
+        'Accept': 'application/json',
+    }
+
+    result = []
+
+    async with get_client() as client:
+        while True:
+            r = await client.get('https://www.googleapis.com/youtube/v3/subscriptions', params=params, headers=headers)
+            resp_dict = r.json()
+
+            items = resp_dict.get('items', [])
+
+            for item in items:
+                channel_id = item['snippet']['resourceId']['channelId']
+                result.append(channel_id)
+
+            if 'nextPageToken' in resp_dict:
+                params['pageToken'] = resp_dict['nextPageToken']
+            else:
+                break
+
+    return result
+
+
+async def get_channel_uploads_playlist_id(channel_id: str) -> str:
+    """get the playlist consisting of all the videos uploaded by the channel"""
+    params = {
+        'part': 'snippet,contentDetails,statistics',
+        'id': channel_id,
+        'key': GCP_APIKEY
+    }
+    async with get_client() as client:
+        resp = await client.get('https://www.googleapis.com/youtube/v3/channels', params=params)
+        resp_dict = resp.json()
+
+    if 'items' in resp_dict and len(resp_dict['items']) > 0:
+        return resp_dict['items'][0]['contentDetails']['relatedPlaylists']['uploads']
+    return ''
+
+
+async def get_channel_uploads_playlist_id_batch(channel_ids: list[str]) -> dict[str, str]:
+    """get the playlist consisting of all the videos uploaded by the channel"""
+    if len(channel_ids) > 50:
+        raise ValueError('The number of channel IDs should not exceed 50.')
+
+    params = {
+        'part': 'snippet,contentDetails,statistics',
+        'id': ','.join(channel_ids),
+        'maxResults': 50,
+        'key': GCP_APIKEY
+    }
+    async with get_client() as client:
+        resp = await client.get('https://www.googleapis.com/youtube/v3/channels', params=params)
+        resp_dict = resp.json()
+
+    result = {channel_id: False for channel_id in channel_ids}
+    for channel in resp_dict.get('items', []):
+        result[channel['id']] = channel['contentDetails']['relatedPlaylists']['uploads']
+
+    return result
+
+
 async def get_all_stream_urls_from_holoinfo(limit: int = 100, max_upcoming_hours: int = -1) -> list[str]:
     """get all video urls from holoinfo"""
     params = {
@@ -290,3 +391,6 @@ async def get_all_stream_urls_from_holoinfo(limit: int = 100, max_upcoming_hours
             return []
 
     return [create_video_link(video_info['id']) for video_info in r.json()]
+
+
+access_token_provider = YouTubeOAuth20Provider()
