@@ -207,16 +207,16 @@ async def get_thumbnail(url: str) -> BytesIO:
 
 async def is_video_available_online(video_id: str) -> bool:
     """check if a video is available"""
-    video_params = {
+    params = {
         'part': 'snippet,statistics',
         'id': video_id,
         'key': GCP_APIKEY
     }
     async with get_client() as client:
-        resp = await client.get('https://youtube.googleapis.com/youtube/v3/videos', params=video_params)
-        video_info = resp.json()
+        resp = await client.get('https://youtube.googleapis.com/youtube/v3/videos', params=params)
+        resp_dict = resp.json()
 
-    return 'items' in video_info and len(video_info['items']) > 0
+    return 'items' in resp_dict and len(resp_dict['items']) > 0
 
 
 async def is_video_available_online_batch(video_ids: list[str]) -> dict[str, bool]:
@@ -224,17 +224,17 @@ async def is_video_available_online_batch(video_ids: list[str]) -> dict[str, boo
     if len(video_ids) > 50:
         raise ValueError('The number of video IDs should not exceed 50.')
 
-    video_params = {
+    params = {
         'part': 'snippet,statistics',
         'id': ','.join(video_ids),
         'key': GCP_APIKEY
     }
     async with get_client() as client:
-        resp = await client.get('https://youtube.googleapis.com/youtube/v3/videos', params=video_params)
-        video_info = resp.json()
+        resp = await client.get('https://youtube.googleapis.com/youtube/v3/videos', params=params)
+        resp_dict = resp.json()
 
     result = {video_id: False for video_id in video_ids}
-    for video in video_info.get('items', []):
+    for video in resp_dict.get('items', []):
         result[video['id']] = 'snippet' in video
 
     return result
@@ -242,7 +242,6 @@ async def is_video_available_online_batch(video_ids: list[str]) -> dict[str, boo
 
 async def get_all_video_urls_from_playlist(playlist_id) -> list[str]:
     """get all video urls from a playlist"""
-    api_url = 'https://www.googleapis.com/youtube/v3/playlistItems'
     params = {
         'part': 'snippet',
         'playlistId': playlist_id,
@@ -254,7 +253,7 @@ async def get_all_video_urls_from_playlist(playlist_id) -> list[str]:
 
     async with get_client() as client:
         while True:
-            r = await client.get(api_url, params=params)
+            r = await client.get('https://www.googleapis.com/youtube/v3/playlistItems', params=params)
             resp_dict = r.json()
             items = resp_dict.get('items', [])
 
@@ -272,7 +271,6 @@ async def get_all_video_urls_from_playlist(playlist_id) -> list[str]:
 
 async def get_all_stream_urls_from_holoinfo(limit: int = 100, max_upcoming_hours: int = -1) -> list[str]:
     """get all video urls from holoinfo"""
-    api_url = 'https://holoinfo.me/dex/videos'
     params = {
         'status': 'past',
         'type': 'stream',
@@ -286,7 +284,7 @@ async def get_all_stream_urls_from_holoinfo(limit: int = 100, max_upcoming_hours
     }
 
     async with get_client() as client:
-        r = await client.get(api_url, headers=headers, params=params)
+        r = await client.get('https://holoinfo.me/dex/videos', headers=headers, params=params)
 
         if r.status_code != 200:
             return []
