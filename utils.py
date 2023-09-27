@@ -1,11 +1,13 @@
 from functools import wraps
 from re import sub
-from typing import Optional
+from typing import Optional, TypeVar, Generator
 
 from aiogram.types import Message
 from httpx import AsyncClient, AsyncHTTPTransport
 
 from config import SUPERUSERS, PROXY
+
+T = TypeVar('T')
 
 
 def convert_date(date: str) -> str:
@@ -53,7 +55,7 @@ def superuser_required(func):
     return wrapper
 
 
-def slide_window(lst: list, window_size: int):
+def slide_window(lst: list[T], window_size: int) -> Generator[list[T], None, None]:
     """generator function that yields window_size elements at a time"""
     for start in range(0, len(lst), window_size):
         yield lst[start:start + window_size]
