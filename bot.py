@@ -9,9 +9,13 @@ from aiogram.utils import executor
 from config import BOT_TOKEN, PROXY, DOWNLOAD_ROOT, CHAT_ID
 from database import is_in_database, get_db_size, get_upload_message_id, get_unavailable_videos_count
 from typedef import Task
-from utils import format_file_size, create_message_link, superuser_required
+from utils import format_file_size, create_message_link, superuser_required, slide_window
 from worker import VideoWorker, VideoChecker
-from youtube import get_video_id, get_playlist_id, get_all_video_urls_from_playlist, get_all_stream_urls_from_holoinfo
+from youtube import (
+    get_video_id, get_playlist_id, get_channel_id,
+    get_all_video_urls_from_playlist, get_all_stream_urls_from_holoinfo,
+    get_all_my_subscription_channel_ids, get_channel_uploads_playlist_id_batch, get_channel_uploads_playlist_id
+)
 
 local_server = TelegramAPIServer.from_base('http://localhost:8083')
 bot = Bot(token=BOT_TOKEN, proxy=PROXY, server=local_server)
@@ -87,6 +91,46 @@ async def _(message: Message):
                         f'{count_urls_filtered} task(s) added')
 
 
+@dp.message_handler(commands=['add_channel'])
+@superuser_required
+async def _(message: Message):
+    if not (channel_id := get_channel_id(message.get_args())):
+        return
+
+    playlist_id = await get_channel_uploads_playlist_id(channel_id)
+    video_urls = await get_all_video_urls_from_playlist(playlist_id, 'ASMR')
+    count_urls = len(video_urls)
+
+    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.message_id)
+
+    await message.reply(f'{count_urls} ASMR video(s) in this channel\n'
+                        f'{count_urls - count_urls_filtered} video(s) skipped\n'
+                        f'{count_urls_filtered} task(s) added')
+
+
+@dp.message_handler(commands=['add_subscription'])
+@superuser_required
+async def _(message: Message):
+    video_urls = []
+    channel_ids = await get_all_my_subscription_channel_ids()
+
+    await message.reply(f'get {len(channel_ids)} channels')
+
+    for batch_channel_ids in slide_window(channel_ids, 50):
+        playlist_ids = await get_channel_uploads_playlist_id_batch(batch_channel_ids)
+
+        for playlist_id in playlist_ids.values():
+            video_urls.extend(await get_all_video_urls_from_playlist(playlist_id, 'ASMR', 5))
+
+    count_urls = len(video_urls)
+
+    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.message_id)
+
+    await message.reply(f'{count_urls} video(s) in recent feeds\n'
+                        f'{count_urls - count_urls_filtered} video(s) skipped\n'
+                        f'{count_urls_filtered} task(s) added')
+
+
 @dp.message_handler(commands=['retry'])
 @superuser_required
 async def _(message: Message):
@@ -128,6 +172,8 @@ async def on_startup(dp_: Dispatcher) -> None:
         BotCommand('stat', 'show statistics'),
         BotCommand('add_list', 'add all videos in a playlist'),
         BotCommand('add_holoinfo', 'add 100 videos from holoinfo'),
+        BotCommand('add_channel', 'all the videos uploaded by the channel'),
+        BotCommand('add_subscription', 'add recent subscription feeds'),
         BotCommand('retry', 'retry all videos with network error'),
     ])
 

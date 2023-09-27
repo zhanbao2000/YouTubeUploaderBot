@@ -195,6 +195,12 @@ def get_playlist_id(url: str) -> Optional[str]:
     return match.group(0) if match else None
 
 
+def get_channel_id(url: str) -> Optional[str]:
+    """get channel id from url"""
+    match = re.search(r'(?<=channel/)[^/]+', url)
+    return match.group(0) if match else None
+
+
 def print_formats_list(video_info: dict) -> None:
     """print the formats list of the video"""
     video_formats, audio_formats = get_formats_list(video_info['formats'])
@@ -269,7 +275,7 @@ async def is_video_available_online_batch(video_ids: list[str]) -> dict[str, boo
     return result
 
 
-async def get_all_video_urls_from_playlist(playlist_id) -> list[str]:
+async def get_all_video_urls_from_playlist(playlist_id, filter_str: str = '', limit: int = 0) -> list[str]:
     """get all video urls from a playlist"""
     params = {
         'part': 'snippet',
@@ -288,9 +294,14 @@ async def get_all_video_urls_from_playlist(playlist_id) -> list[str]:
 
             for item in items:
                 video_id = item['snippet']['resourceId']['videoId']
-                result.append(f'https://www.youtube.com/watch?v={video_id}')
 
-            if 'nextPageToken' in resp_dict:
+                if filter_str in item['snippet']['title']:
+                    result.append(f'https://www.youtube.com/watch?v={video_id}')
+
+                if len(result) >= limit:
+                    return result
+
+            if 'nextPageToken' in resp_dict and not limit:  # with limit != 0 will ignore next page
                 params['pageToken'] = resp_dict['nextPageToken']
             else:
                 break
