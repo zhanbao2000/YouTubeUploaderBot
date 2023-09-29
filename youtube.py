@@ -7,7 +7,7 @@ from typing import Optional
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import YoutubeDLError
 
-from config import DOWNLOAD_ROOT, GCP_APIKEY, CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN
+from config import PROXY, DOWNLOAD_ROOT, GCP_APIKEY, CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN
 from utils import format_file_size, convert_date, get_client, escape_markdown, create_video_link
 
 
@@ -64,6 +64,7 @@ class DownloadManager(object):
     def _get_base_ydl_options(self) -> dict:
         """get base ydl options"""
         return {
+            'proxy': PROXY,
             'ffmpeg_location': 'bin',
             'concurrent_fragment_downloads': 16,
             'outtmpl': str(self.file),
