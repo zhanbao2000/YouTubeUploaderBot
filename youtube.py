@@ -85,6 +85,10 @@ class DownloadManager(object):
             ):
                 raise YoutubeDLError('Inconclusive download format.')
 
+            # check if duration less than minimum duration
+            if video_info['duration'] <= 300:  # 5 min
+                raise RuntimeError(f'Too small video, duration: {video_info["duration"]}')
+
             ydl.params.update({
                 'skip_download': False,
             })
