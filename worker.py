@@ -21,10 +21,12 @@ class VideoWorker(object):
         self.loop = loop
         self.bot = bot
         self.video_queue: Queue[Task] = Queue()
-        self.current_task = Optional[Task]
+        self.current_task: Optional[Task] = None
         self.current_running_transfer_files = 0  # total files transferred from startup
         self.current_running_transfer_size = 0  # total size transferred from startup
         self.current_running_retry_list: set[str] = set()  # save links with download error
+        self.current_running_reply_on_success = True
+        self.current_running_reply_on_failure = True
 
     def get_pending_tasks_count(self) -> int:
         """return pending tasks = waiting + current"""
@@ -64,7 +66,7 @@ class VideoWorker(object):
         """clear the download folder and reply to the user"""
         for file in Path(DOWNLOAD_ROOT).glob('*'):
             file.unlink()
-            await self.reply(f'deleted {file.name}')
+            await self.reply_failure(f'deleted {file.name}')
 
     async def clear_queue(self) -> None:
         """immediately clear all waiting tasks, will not cancel current task"""
@@ -74,19 +76,30 @@ class VideoWorker(object):
             except QueueEmpty:
                 continue
 
+    async def reply_success(self, text: str, **kwargs) -> Message:
+        """reply when the video is successfully uploaded"""
+        if self.current_running_reply_on_success:
+            return await self.reply(text, **kwargs)
+
+    async def reply_failure(self, text: str, **kwargs) -> Message:
+        """reply to the message when the video is successfully uploaded"""
+        if self.current_running_reply_on_failure:
+            return await self.reply(text, **kwargs)
+
     async def reply_duplicate(self, video_id: str) -> None:
         """inform the user that this video had been uploaded"""
         if video_message_id := get_upload_message_id(video_id):  # video_message_id == 0
-            await self.reply(f'this video had been [uploaded]({create_message_link(CHAT_ID, video_message_id)})', parse_mode='Markdown')
+            await self.reply_failure(f'this video had been [uploaded]({create_message_link(CHAT_ID, video_message_id)})',
+                                     parse_mode='Markdown')
         else:  # video_message_id != 0
-            await self.reply('this video used to be tried to upload, but failed')
+            await self.reply_failure('this video used to be tried to upload, but failed')
 
     async def reply_task_done(self) -> None:
         """inform the user that this task had been done"""
         if self.get_queue_size():
-            await self.reply(f'task finished\npending task(s): {self.get_queue_size()}')
+            await self.reply_success(f'task finished\npending task(s): {self.get_queue_size()}')
         else:
-            await self.reply('all tasks finished')
+            await self.reply_success('all tasks finished')
 
     async def download_video(self, dm: DownloadManager) -> dict:
         """download the video, return the video info"""
@@ -94,7 +107,7 @@ class VideoWorker(object):
 
         if (filesize := dm.file.stat().st_size) >= 2e9:
             dm.file.unlink()
-            await self.reply(f'file too big: {format_file_size(filesize)}\ntry downloading smaller format')
+            await self.reply_failure(f'file too big: {format_file_size(filesize)}\ntry downloading smaller format')
             video_info = await self.loop.run_in_executor(None, dm.download_max_size_1600mb)
             # if this format is still too big, the video_id will be recorded in db with message_id = 0
 
@@ -146,9 +159,9 @@ class VideoWorker(object):
 
         if retry_reason:
             self.current_running_retry_list.add(dm.url)
-            await self.reply(f'{retry_reason}: {dm.video_id}\n{msg}\nthis url has been saved to retry list, you can retry it later')
+            await self.reply_failure(f'{retry_reason}: {dm.video_id}\n{msg}\nthis url has been saved to retry list, you can retry it later')
         else:
-            await self.reply(f'error on uploading this video: {dm.video_id}\n{msg}\n')
+            await self.reply_failure(f'error on uploading this video: {dm.video_id}\n{msg}\n')
 
     async def work(self) -> None:
         """main work loop"""
@@ -172,8 +185,7 @@ class VideoWorker(object):
                 await self.on_download_error(dm, e)
 
             except Exception:  # noqa
-                await self.reply(f'error on uploading this video: {dm.video_id}\n'
-                                 f'{format_exc().splitlines()[-1]}')
+                await self.reply_failure(f'error on uploading this video: {dm.video_id}\n{format_exc().splitlines()[-1]}')
 
             else:
                 await self.reply_task_done()

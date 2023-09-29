@@ -59,7 +59,9 @@ async def _(message: Message):
                         f'pending task(s): {worker.get_pending_tasks_count()}\n'
                         f'retry list size: {len(worker.current_running_retry_list)}\n'
                         f'database size: {get_db_size()}\n'
-                        f'saved unavailable video(s): {get_unavailable_videos_count()}')
+                        f'saved unavailable video(s): {get_unavailable_videos_count()}\n'
+                        f'notify on success: {worker.current_running_reply_on_success}\n'
+                        f'notify on failure: {worker.current_running_reply_on_failure}')
 
 
 @dp.message_handler(commands=['add_list'])
@@ -144,6 +146,24 @@ async def _(message: Message):
                         f'{count_urls_filtered} task(s) added')
 
 
+@dp.message_handler(commands=['toggle_reply_on_success'])
+@superuser_required
+async def _(message: Message):
+    worker.current_running_reply_on_success = not worker.current_running_reply_on_success
+    await message.reply(f'current notification setting\n'
+                        f'on success: {worker.current_running_reply_on_success}\n'
+                        f'on failure: {worker.current_running_reply_on_failure}')
+
+
+@dp.message_handler(commands=['toggle_reply_on_failure'])
+@superuser_required
+async def _(message: Message):
+    worker.current_running_reply_on_failure = not worker.current_running_reply_on_failure
+    await message.reply(f'current notification setting\n'
+                        f'on success: {worker.current_running_reply_on_success}\n'
+                        f'on failure: {worker.current_running_reply_on_failure}')
+
+
 @dp.message_handler(regexp=r'(?:v=|/)([0-9A-Za-z_-]{11}).*')
 @superuser_required
 async def _(message: Message):
@@ -175,6 +195,8 @@ async def on_startup(dp_: Dispatcher) -> None:
         BotCommand('add_channel', 'all the videos uploaded by the channel'),
         BotCommand('add_subscription', 'add recent subscription feeds'),
         BotCommand('retry', 'retry all videos with network error'),
+        BotCommand('toggle_reply_on_success', 'change success notification setting'),
+        BotCommand('toggle_reply_on_failure', 'change failure notification setting'),
     ])
 
 
