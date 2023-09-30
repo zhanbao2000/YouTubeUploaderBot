@@ -303,7 +303,7 @@ async def get_all_video_urls_from_playlist(playlist_id, filter_str: str = '', li
                 if filter_str in item['snippet']['title']:
                     result.append(f'https://www.youtube.com/watch?v={video_id}')
 
-                if len(result) >= limit:
+                if limit and len(result) >= limit:
                     return result
 
             if 'nextPageToken' in resp_dict and not limit:  # with limit != 0 will ignore next page
