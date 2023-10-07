@@ -10,7 +10,7 @@ from config import BOT_TOKEN, PROXY, DOWNLOAD_ROOT, CHAT_ID
 from database import is_in_database, get_db_size, get_upload_message_id, get_unavailable_videos_count
 from typedef import Task
 from utils import format_file_size, create_message_link, superuser_required, slide_window
-from worker import VideoWorker, VideoChecker
+from worker import VideoWorker, VideoChecker, SchedulerManager
 from youtube import (
     get_video_id, get_playlist_id, get_channel_id,
     get_all_video_urls_from_playlist, get_all_stream_urls_from_holoinfo,
@@ -208,5 +208,7 @@ if __name__ == '__main__':
     global_loop = get_event_loop()
     worker = VideoWorker(global_loop, bot)
     global_loop.create_task(worker.work())
+    scheduler_manager = SchedulerManager(worker, bot)
+    scheduler_manager.start()
 
     executor.start_polling(dp, skip_updates=True, on_startup=on_startup)

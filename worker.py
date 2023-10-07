@@ -1,17 +1,24 @@
-from asyncio import Queue, QueueEmpty, AbstractEventLoop, sleep
+from asyncio import Queue, QueueEmpty, AbstractEventLoop, sleep, create_task
 from pathlib import Path
 from traceback import format_exc
 from typing import Iterable, Optional
 
 from aiogram import Bot
 from aiogram.types import Message, ParseMode
+from apscheduler.events import JobExecutionEvent, EVENT_JOB_ERROR
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from pytz import timezone
 from yt_dlp.utils import YoutubeDLError
 
-from config import DOWNLOAD_ROOT, CHAT_ID
+from config import DOWNLOAD_ROOT, CHAT_ID, SUPERUSERS
 from database import insert_uploaded, is_in_database, get_upload_message_id, update_available, is_available, get_all_video_ids
 from typedef import Task, RetryReason
 from utils import format_file_size, create_message_link, escape_color, slide_window
-from youtube import DownloadManager, get_video_caption, get_video_id, get_thumbnail, is_video_available_online_batch
+from youtube import (
+    DownloadManager, get_video_caption, get_video_id, get_thumbnail, is_video_available_online_batch,
+    get_all_my_subscription_channel_ids, get_channel_uploads_playlist_id_batch, get_all_video_urls_from_playlist,
+    get_all_stream_urls_from_holoinfo
+)
 
 
 class VideoWorker(object):
@@ -255,3 +262,59 @@ class VideoChecker(object):
 
                 await self.check_progress()
                 await self.check_video(video_id, video_available_online, video_available_local)
+
+
+class SchedulerManager(object):
+
+    def __init__(self, worker: VideoWorker, bot: Bot):
+        self.worker = worker
+        self.bot = bot
+        self.scheduler = AsyncIOScheduler()
+
+        beijing_tz = timezone('Asia/Shanghai')
+
+        self.scheduler.add_job(self.add_holoinfo, 'cron', hour='3', timezone=beijing_tz)
+        self.scheduler.add_job(self.add_subscription, 'cron', hour='3', timezone=beijing_tz)
+        self.scheduler.add_job(self.retry, 'cron', hour='6,9,12', timezone=beijing_tz)
+
+        self.scheduler.add_listener(self.on_error, EVENT_JOB_ERROR)
+
+    def start(self):
+        """start scheduler"""
+        self.scheduler.start()
+
+    def on_error(self, event: JobExecutionEvent):
+        """handle error during execute tasks"""
+        job = self.scheduler.get_job(event.job_id)
+        exc_class = event.exception.__class__.__name__
+
+        create_task(self.reply(f'error on execute this job: {job.name}\n'
+                               f'{exc_class}: {event.exception}\n'
+                               f'next run at: {job.next_run_time}'))
+
+    async def reply(self, text: str, **kwargs) -> Message:
+        """reply to first admin"""
+        return await self.bot.send_message(chat_id=SUPERUSERS[0], text=text, **kwargs)
+
+    async def add_subscription(self):
+        """add recent subscription feeds"""
+        video_urls = []
+        channel_ids = await get_all_my_subscription_channel_ids()
+
+        for batch_channel_ids in slide_window(channel_ids, 50):
+            playlist_ids = await get_channel_uploads_playlist_id_batch(batch_channel_ids)
+
+            for playlist_id in playlist_ids.values():
+                video_urls.extend(await get_all_video_urls_from_playlist(playlist_id, 'ASMR', 5))
+
+        await self.worker.add_task_batch(video_urls, None, None)
+
+    async def add_holoinfo(self):
+        """add 100 videos from holoinfo"""
+        video_urls = await get_all_stream_urls_from_holoinfo()
+        await self.worker.add_task_batch(video_urls, None, None)
+
+    async def retry(self):
+        """retry all videos with network error"""
+        await self.worker.add_task_batch(self.worker.current_running_retry_list, None, None)
+        self.worker.current_running_retry_list.clear()
