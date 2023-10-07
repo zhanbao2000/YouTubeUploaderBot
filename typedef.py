@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 
 
 class RetryReason(str, Enum):
@@ -10,5 +10,5 @@ class RetryReason(str, Enum):
 
 class Task(NamedTuple):
     url: str
-    chat_id: int
-    message_id: int
+    chat_id: Optional[int]
+    message_id: Optional[int]

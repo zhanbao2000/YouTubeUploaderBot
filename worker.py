@@ -5,7 +5,6 @@ from typing import Iterable, Optional
 
 from aiogram import Bot
 from aiogram.types import Message, ParseMode
-from aiogram.types.base import Integer
 from yt_dlp.utils import YoutubeDLError
 
 from config import DOWNLOAD_ROOT, CHAT_ID
@@ -40,7 +39,7 @@ class VideoWorker(object):
         """add a new task"""
         await self.video_queue.put(task)
 
-    async def add_task_batch(self, urls: Iterable[str], chat_id: Integer, message_id: Integer) -> int:
+    async def add_task_batch(self, urls: Iterable[str], chat_id: Optional[int], message_id: Optional[int]) -> int:
         """add many new tasks"""
         count_task_added = 0
         for url in urls:
@@ -53,14 +52,16 @@ class VideoWorker(object):
 
         return count_task_added
 
-    async def reply(self, text: str, **kwargs) -> Message:
+    async def reply(self, text: str, **kwargs) -> Optional[Message]:
         """reply to the message which triggered current task"""
-        return await self.bot.send_message(
-            chat_id=self.current_task.chat_id,
-            reply_to_message_id=self.current_task.message_id,
-            text=text,
-            **kwargs
-        )
+        # if current_task does not provide chat_id or message_id, ignore
+        if self.current_task.chat_id and self.current_task.message_id:
+            return await self.bot.send_message(
+                chat_id=self.current_task.chat_id,
+                reply_to_message_id=self.current_task.message_id,
+                text=text,
+                **kwargs
+            )
 
     async def clear_download_folder(self) -> None:
         """clear the download folder and reply to the user"""
@@ -76,12 +77,12 @@ class VideoWorker(object):
             except QueueEmpty:
                 continue
 
-    async def reply_success(self, text: str, **kwargs) -> Message:
+    async def reply_success(self, text: str, **kwargs) -> Optional[Message]:
         """reply when the video is successfully uploaded"""
         if self.current_running_reply_on_success:
             return await self.reply(text, **kwargs)
 
-    async def reply_failure(self, text: str, **kwargs) -> Message:
+    async def reply_failure(self, text: str, **kwargs) -> Optional[Message]:
         """reply to the message when the video is successfully uploaded"""
         if self.current_running_reply_on_failure:
             return await self.reply(text, **kwargs)
