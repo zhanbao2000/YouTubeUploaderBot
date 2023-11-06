@@ -1,4 +1,5 @@
 DROP TABLE IF EXISTS video;
+DROP TABLE IF EXISTS extra_subscription;
 
 CREATE TABLE video (
   video_id TEXT PRIMARY KEY,
@@ -10,3 +11,8 @@ CREATE TABLE video (
     -- -1: error on uploading
     -- -2: unavailable video
 );
+
+CREATE TABLE extra_subscription (
+    channel_id TEXT PRIMARY KEY,
+    add_ts INTEGER NULL DEFAULT (datetime('now','localtime'))
+)

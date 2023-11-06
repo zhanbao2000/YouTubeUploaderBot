@@ -8,7 +8,7 @@ from yt_dlp import YoutubeDL
 from yt_dlp.utils import YoutubeDLError
 
 from config import PROXY, DOWNLOAD_ROOT, GCP_APIKEY, CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN
-from model.channels import Channels
+from model.channels import Channels, Channel
 from model.playlistItems import PlaylistItems
 from model.subscriptions import Subscriptions
 from model.videos import Videos
@@ -284,7 +284,7 @@ async def is_video_available_online_batch(video_ids: list[str]) -> dict[str, boo
     return result
 
 
-async def get_all_video_urls_from_playlist(playlist_id, filter_str: str = '', limit: int = 0) -> list[str]:
+async def get_all_video_urls_from_playlist(playlist_id: str, filter_str: str = '', limit: int = 0) -> list[str]:
     """get all video urls from a playlist"""
     params = {
         'part': 'snippet',
@@ -349,6 +349,22 @@ async def get_all_my_subscription_channel_ids() -> list[str]:
                 break
 
     return result
+
+
+async def get_channel_info(channel_id: str) -> Optional[Channel]:
+    """get channel info"""
+    params = {
+        'part': 'snippet,contentDetails,statistics',
+        'id': channel_id,
+        'key': GCP_APIKEY
+    }
+    async with get_client() as client:
+        resp = await client.get('https://www.googleapis.com/youtube/v3/channels', params=params)
+        channels = Channels(**resp.json())
+
+    if len(channels.items) > 0:
+        return channels.items[0]
+    return None
 
 
 async def get_channel_uploads_playlist_id(channel_id: str) -> str:

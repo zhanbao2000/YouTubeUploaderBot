@@ -34,6 +34,16 @@ def insert_uploaded(video_id: str, message_id: Optional[int]) -> None:
         c.execute('INSERT INTO video (video_id, message_id, status) VALUES (?, ?, ?)', (video_id, message_id, status))
 
 
+def insert_extra_subscription(channel_id: str) -> bool:
+    """insert an extra subscription into database"""
+    try:
+        with Connect('database.dat') as c:
+            c.execute('INSERT INTO extra_subscription (channel_id) VALUES (?)', (channel_id,))
+        return True
+    except sqlite3.IntegrityError:  # channel_id already exists
+        return False
+
+
 def update_available(video_id: str, available: bool) -> None:
     """set a video as unavailable"""
     with Connect('database.dat') as c:
@@ -57,6 +67,13 @@ def get_all_video_ids() -> list[str]:
         return [video_id for video_id, in c.fetchall()]
 
 
+def get_all_extra_subscription_channel_ids() -> list[str]:
+    """get all extra subscription channel ids"""
+    with Connect('database.dat') as c:
+        c.execute('SELECT channel_id FROM extra_subscription')
+        return [channel_id for channel_id, in c.fetchall()]
+
+
 def get_upload_message_id(video_id: str) -> Optional[int]:
     """get the message_id of the message of the video"""
     with Connect('database.dat') as c:
@@ -65,8 +82,8 @@ def get_upload_message_id(video_id: str) -> Optional[int]:
     return result[0] if result else None
 
 
-def get_db_size() -> int:
-    """get the size of the database, namely the number of videos in the database"""
+def get_backup_videos_count() -> int:
+    """get the number of videos in the database"""
     with Connect('database.dat') as c:
         c.execute('SELECT COUNT(*) FROM video')
         return c.fetchone()[0]
@@ -76,4 +93,11 @@ def get_unavailable_videos_count() -> int:
     """get the number of unavailable videos"""
     with Connect('database.dat') as c:
         c.execute('SELECT COUNT(*) FROM video WHERE status = -2')
+        return c.fetchone()[0]
+
+
+def get_extra_subscriptions_count() -> int:
+    """get the number of extra subscriptions"""
+    with Connect('database.dat') as c:
+        c.execute('SELECT COUNT(*) FROM extra_subscription')
         return c.fetchone()[0]

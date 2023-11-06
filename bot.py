@@ -3,18 +3,22 @@ from pathlib import Path
 
 from aiogram import Bot, Dispatcher
 from aiogram.bot.api import TelegramAPIServer
-from aiogram.types import BotCommand, Message
+from aiogram.types import BotCommand, Message, ParseMode
 from aiogram.utils import executor
 
 from config import BOT_TOKEN, PROXY, DOWNLOAD_ROOT, CHAT_ID
-from database import is_in_database, get_db_size, get_upload_message_id, get_unavailable_videos_count
+from database import (
+    is_in_database, get_upload_message_id, insert_extra_subscription,
+    get_backup_videos_count, get_unavailable_videos_count, get_extra_subscriptions_count,
+    get_all_extra_subscription_channel_ids
+)
 from typedef import Task
-from utils import format_file_size, create_message_link, superuser_required, slide_window
+from utils import format_file_size, create_message_link, superuser_required, slide_window, escape_markdown
 from worker import VideoWorker, VideoChecker, SchedulerManager
 from youtube import (
     get_video_id, get_playlist_id, get_channel_id,
     get_all_video_urls_from_playlist, get_all_stream_urls_from_holoinfo,
-    get_all_my_subscription_channel_ids, get_channel_uploads_playlist_id_batch, get_channel_uploads_playlist_id,
+    get_channel_info, get_all_my_subscription_channel_ids, get_channel_uploads_playlist_id_batch, get_channel_uploads_playlist_id,
     get_channel_id_by_link
 )
 
@@ -59,7 +63,8 @@ async def _(message: Message):
                         f'transfer size: {format_file_size(worker.current_running_transfer_size)}\n'
                         f'pending task(s): {worker.get_pending_tasks_count()}\n'
                         f'retry list size: {len(worker.current_running_retry_list)}\n'
-                        f'database size: {get_db_size()}\n'
+                        f'backup videos count: {get_backup_videos_count()}\n'
+                        f'extra subscription count: {get_extra_subscriptions_count()}\n'
                         f'saved unavailable video(s): {get_unavailable_videos_count()}\n'
                         f'notify on success: {worker.current_running_reply_on_success}\n'
                         f'notify on failure: {worker.current_running_reply_on_failure}')
@@ -98,7 +103,7 @@ async def _(message: Message):
 @superuser_required
 async def _(message: Message):
     url = message.get_args()
-    if not (channel_id := get_channel_id(url) or await get_channel_id_by_link(url)):
+    if not url or not (channel_id := get_channel_id(url) or await get_channel_id_by_link(url)):
         return
 
     playlist_id = await get_channel_uploads_playlist_id(channel_id)
@@ -116,9 +121,9 @@ async def _(message: Message):
 @superuser_required
 async def _(message: Message):
     video_urls = []
-    channel_ids = await get_all_my_subscription_channel_ids()
+    channel_ids = await get_all_my_subscription_channel_ids() + get_all_extra_subscription_channel_ids()
 
-    await message.reply(f'get {len(channel_ids)} channels')
+    await message.reply(f'get {len(channel_ids)} channels ({get_extra_subscriptions_count()} in extra)')
 
     for batch_channel_ids in slide_window(channel_ids, 50):
         playlist_ids = await get_channel_uploads_playlist_id_batch(batch_channel_ids)
@@ -133,6 +138,25 @@ async def _(message: Message):
     await message.reply(f'{count_urls} video(s) in recent feeds\n'
                         f'{count_urls - count_urls_filtered} video(s) skipped\n'
                         f'{count_urls_filtered} task(s) added')
+
+
+@dp.message_handler(commands=['add_extra_subscription'])
+@superuser_required
+async def _(message: Message):
+    url = message.get_args()
+    if not url or not (channel_id := get_channel_id(url) or await get_channel_id_by_link(url)):
+        return
+
+    if not (channel := await get_channel_info(channel_id)):
+        await message.reply('this channel does not exist')
+
+    elif not insert_extra_subscription(channel_id):
+        await message.reply('this channel has been added')
+
+    else:
+        await message.reply(f'channel added\n'
+                            f'[{escape_markdown(channel.snippet.title)}](https://www.youtube.com/channel/{channel_id})',
+                            parse_mode=ParseMode.MARKDOWN_V2)
 
 
 @dp.message_handler(commands=['retry'])
@@ -196,6 +220,7 @@ async def on_startup(dp_: Dispatcher) -> None:
         BotCommand('add_holoinfo', 'add 100 videos from holoinfo'),
         BotCommand('add_channel', 'all the videos uploaded by the channel'),
         BotCommand('add_subscription', 'add recent subscription feeds'),
+        BotCommand('add_extra_subscription', 'add channel into separated subscription list'),
         BotCommand('retry', 'retry all videos with network error'),
         BotCommand('toggle_reply_on_success', 'change success notification setting'),
         BotCommand('toggle_reply_on_failure', 'change failure notification setting'),

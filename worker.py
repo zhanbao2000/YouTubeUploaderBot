@@ -11,7 +11,11 @@ from pytz import timezone
 from yt_dlp.utils import YoutubeDLError
 
 from config import DOWNLOAD_ROOT, CHAT_ID, SUPERUSERS
-from database import insert_uploaded, is_in_database, get_upload_message_id, update_available, is_available, get_all_video_ids
+from database import (
+    insert_uploaded, is_in_database,
+    get_upload_message_id, update_available, is_available, get_all_video_ids,
+    get_all_extra_subscription_channel_ids
+)
 from typedef import Task, RetryReason
 from utils import format_file_size, create_message_link, escape_color, slide_window
 from youtube import (
@@ -299,7 +303,7 @@ class SchedulerManager(object):
     async def add_subscription(self):
         """add recent subscription feeds"""
         video_urls = []
-        channel_ids = await get_all_my_subscription_channel_ids()
+        channel_ids = await get_all_my_subscription_channel_ids() + get_all_extra_subscription_channel_ids()
 
         for batch_channel_ids in slide_window(channel_ids, 50):
             playlist_ids = await get_channel_uploads_playlist_id_batch(batch_channel_ids)
