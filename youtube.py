@@ -409,4 +409,16 @@ async def get_all_stream_urls_from_holoinfo(limit: int = 100, max_upcoming_hours
     return [create_video_link(video_info['id']) for video_info in r.json()]
 
 
+async def get_channel_id_by_link(url: str) -> Optional[str]:
+    """get channel id from webpage"""
+    async with get_client(follow_redirects=True) as client:
+        r = await client.get(url)
+
+        if r.status_code != 200:
+            return None
+
+    match = re.search(r'(https?://www\.youtube\.com/channel/([a-zA-Z0-9_-]{24}))', r.text)
+    return get_channel_id(match.group(0)) if match else None
+
+
 access_token_provider = YouTubeOAuth20Provider()
