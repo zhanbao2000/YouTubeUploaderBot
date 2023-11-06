@@ -8,6 +8,10 @@ from yt_dlp import YoutubeDL
 from yt_dlp.utils import YoutubeDLError
 
 from config import PROXY, DOWNLOAD_ROOT, GCP_APIKEY, CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN
+from model.channels import Channels
+from model.playlistItems import PlaylistItems
+from model.subscriptions import Subscriptions
+from model.videos import Videos
 from utils import format_file_size, convert_date, get_client, escape_markdown, create_video_link
 
 
@@ -254,9 +258,9 @@ async def is_video_available_online(video_id: str) -> bool:
     }
     async with get_client() as client:
         resp = await client.get('https://youtube.googleapis.com/youtube/v3/videos', params=params)
-        resp_dict = resp.json()
+        videos = Videos(**resp.json())
 
-    return 'items' in resp_dict and len(resp_dict['items']) > 0
+    return len(videos.items) > 0
 
 
 async def is_video_available_online_batch(video_ids: list[str]) -> dict[str, bool]:
@@ -271,11 +275,11 @@ async def is_video_available_online_batch(video_ids: list[str]) -> dict[str, boo
     }
     async with get_client() as client:
         resp = await client.get('https://youtube.googleapis.com/youtube/v3/videos', params=params)
-        resp_dict = resp.json()
+        videos = Videos(**resp.json())
 
     result = {video_id: False for video_id in video_ids}
-    for video in resp_dict.get('items', []):
-        result[video['id']] = 'snippet' in video
+    for video in videos.items:
+        result[video.id] = True
 
     return result
 
@@ -293,21 +297,20 @@ async def get_all_video_urls_from_playlist(playlist_id, filter_str: str = '', li
 
     async with get_client() as client:
         while True:
-            r = await client.get('https://www.googleapis.com/youtube/v3/playlistItems', params=params)
-            resp_dict = r.json()
-            items = resp_dict.get('items', [])
+            resp = await client.get('https://www.googleapis.com/youtube/v3/playlistItems', params=params)
+            playlist_items = PlaylistItems(**resp.json())
 
-            for item in items:
-                video_id = item['snippet']['resourceId']['videoId']
+            for playlist_item in playlist_items.items:
+                video_id = playlist_item.snippet.resourceId.videoId
 
-                if filter_str in item['snippet']['title']:
+                if filter_str in playlist_item.snippet.title:
                     result.append(f'https://www.youtube.com/watch?v={video_id}')
 
                 if limit and len(result) >= limit:
                     return result
 
-            if 'nextPageToken' in resp_dict and not limit:  # with limit != 0 will ignore next page
-                params['pageToken'] = resp_dict['nextPageToken']
+            if playlist_items.nextPageToken and not limit:  # with limit != 0 will ignore next page
+                params['pageToken'] = playlist_items.nextPageToken
             else:
                 break
 
@@ -331,17 +334,17 @@ async def get_all_my_subscription_channel_ids() -> list[str]:
 
     async with get_client() as client:
         while True:
-            r = await client.get('https://www.googleapis.com/youtube/v3/subscriptions', params=params, headers=headers)
-            resp_dict = r.json()
+            resp = await client.get('https://www.googleapis.com/youtube/v3/subscriptions', params=params, headers=headers)
+            subscriptions = Subscriptions(**resp.json())
 
-            items = resp_dict.get('items', [])
+            items = subscriptions.items
 
             for item in items:
-                channel_id = item['snippet']['resourceId']['channelId']
+                channel_id = item.snippet.resourceId.channelId
                 result.append(channel_id)
 
-            if 'nextPageToken' in resp_dict:
-                params['pageToken'] = resp_dict['nextPageToken']
+            if subscriptions.nextPageToken:
+                params['pageToken'] = subscriptions.nextPageToken
             else:
                 break
 
@@ -357,10 +360,10 @@ async def get_channel_uploads_playlist_id(channel_id: str) -> str:
     }
     async with get_client() as client:
         resp = await client.get('https://www.googleapis.com/youtube/v3/channels', params=params)
-        resp_dict = resp.json()
+        channels = Channels(**resp.json())
 
-    if 'items' in resp_dict and len(resp_dict['items']) > 0:
-        return resp_dict['items'][0]['contentDetails']['relatedPlaylists']['uploads']
+    if len(channels.items) > 0:
+        return channels.items[0].contentDetails.relatedPlaylists.uploads
     return ''
 
 
@@ -377,11 +380,11 @@ async def get_channel_uploads_playlist_id_batch(channel_ids: list[str]) -> dict[
     }
     async with get_client() as client:
         resp = await client.get('https://www.googleapis.com/youtube/v3/channels', params=params)
-        resp_dict = resp.json()
+        channels = Channels(**resp.json())
 
     result = {channel_id: False for channel_id in channel_ids}
-    for channel in resp_dict.get('items', []):
-        result[channel['id']] = channel['contentDetails']['relatedPlaylists']['uploads']
+    for channel in channels.items:
+        result[channel.id] = channel.contentDetails.relatedPlaylists.uploads
 
     return result
 
@@ -401,12 +404,12 @@ async def get_all_stream_urls_from_holoinfo(limit: int = 100, max_upcoming_hours
     }
 
     async with get_client() as client:
-        r = await client.get('https://holoinfo.me/dex/videos', headers=headers, params=params)
+        resp = await client.get('https://holoinfo.me/dex/videos', headers=headers, params=params)
 
-        if r.status_code != 200:
+        if resp.status_code != 200:
             return []
 
-    return [create_video_link(video_info['id']) for video_info in r.json()]
+    return [create_video_link(video_info['id']) for video_info in resp.json()]
 
 
 async def get_channel_id_by_link(url: str) -> Optional[str]:
