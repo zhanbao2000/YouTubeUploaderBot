@@ -14,7 +14,8 @@ from worker import VideoWorker, VideoChecker, SchedulerManager
 from youtube import (
     get_video_id, get_playlist_id, get_channel_id,
     get_all_video_urls_from_playlist, get_all_stream_urls_from_holoinfo,
-    get_all_my_subscription_channel_ids, get_channel_uploads_playlist_id_batch, get_channel_uploads_playlist_id
+    get_all_my_subscription_channel_ids, get_channel_uploads_playlist_id_batch, get_channel_uploads_playlist_id,
+    get_channel_id_by_link
 )
 
 local_server = TelegramAPIServer.from_base('http://localhost:8083')
@@ -96,7 +97,8 @@ async def _(message: Message):
 @dp.message_handler(commands=['add_channel'])
 @superuser_required
 async def _(message: Message):
-    if not (channel_id := get_channel_id(message.get_args())):
+    url = message.get_args()
+    if not (channel_id := get_channel_id(url) or await get_channel_id_by_link(url)):
         return
 
     playlist_id = await get_channel_uploads_playlist_id(channel_id)
