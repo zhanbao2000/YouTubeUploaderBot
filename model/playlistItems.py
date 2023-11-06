@@ -42,8 +42,10 @@ class PageInfo(BaseModel):
 
 
 class PlaylistItems(BaseModel):
-    kind: str
-    etag: str
-    nextPageToken: Optional[str] = None
-    items: list[PlaylistItem]
-    pageInfo: PageInfo
+    # not like other API, this API will return error info when playlist not found,
+    # instead of return an empty items list
+    kind: str = ''
+    etag: str = ''
+    items: list[PlaylistItem] = []
+    pageInfo: Optional[PageInfo] = None
+    nextPageToken: str = ''

@@ -59,5 +59,5 @@ class Channel(BaseModel):
 class Channels(BaseModel):
     kind: str
     etag: str
+    items: list[Channel] = []
     pageInfo: PageInfo
-    items: list[Channel]

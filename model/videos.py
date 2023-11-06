@@ -52,5 +52,5 @@ class PageInfo(BaseModel):
 class Videos(BaseModel):
     kind: str
     etag: str
-    items: list[Video]
+    items: list[Video] = []
     pageInfo: PageInfo

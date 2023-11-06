@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -37,6 +36,6 @@ class Subscription(BaseModel):
 class Subscriptions(BaseModel):
     kind: str
     etag: str
-    nextPageToken: Optional[str] = None
+    items: list[Subscription] = []
     pageInfo: PageInfo
-    items: list[Subscription]
+    nextPageToken: str = ''
