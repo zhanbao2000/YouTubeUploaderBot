@@ -283,7 +283,7 @@ class SchedulerManager(object):
 
         self.scheduler.add_listener(self.on_error, EVENT_JOB_ERROR)
 
-    def start(self):
+    def start(self) -> None:
         """start scheduler"""
         self.scheduler.start()
 
@@ -300,7 +300,7 @@ class SchedulerManager(object):
         """reply to first admin"""
         return await self.bot.send_message(chat_id=SUPERUSERS[0], text=text, **kwargs)
 
-    async def add_subscription(self):
+    async def add_subscription(self) -> None:
         """add recent subscription feeds"""
         video_urls = []
         channel_ids = await get_all_my_subscription_channel_ids() + get_all_extra_subscription_channel_ids()
@@ -313,12 +313,12 @@ class SchedulerManager(object):
 
         await self.worker.add_task_batch(video_urls, None, None)
 
-    async def add_holoinfo(self):
+    async def add_holoinfo(self) -> None:
         """add 100 videos from holoinfo"""
         video_urls = await get_all_stream_urls_from_holoinfo()
         await self.worker.add_task_batch(video_urls, None, None)
 
-    async def retry(self):
+    async def retry(self) -> None:
         """retry all videos with network error"""
         await self.worker.add_task_batch(self.worker.current_running_retry_list, None, None)
         self.worker.current_running_retry_list.clear()
