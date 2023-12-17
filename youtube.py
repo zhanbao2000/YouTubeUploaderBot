@@ -398,11 +398,10 @@ async def get_channel_uploads_playlist_id_batch(channel_ids: list[str]) -> dict[
         resp = await client.get('https://www.googleapis.com/youtube/v3/channels', params=params)
         channels = Channels(**resp.json())
 
-    result = {channel_id: False for channel_id in channel_ids}
-    for channel in channels.items:
-        result[channel.id] = channel.contentDetails.relatedPlaylists.uploads
-
-    return result
+    return {
+        channel.id: channel.contentDetails.relatedPlaylists.uploads
+        for channel in channels.items
+    }
 
 
 async def get_all_stream_urls_from_holoinfo(limit: int = 100, max_upcoming_hours: int = -1) -> list[str]:
