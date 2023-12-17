@@ -46,13 +46,17 @@ async def _(message: Message):
                         f'🔴 -> 🟢: {checker.count_become_available}')
 
 
-@dp.message_handler(commands=['clear'])
+@dp.message_handler(commands=['retry'])
 @superuser_required
 async def _(message: Message):
-    await message.reply(f'{worker.get_queue_size()} pending task(s) cancelled\n'
-                        f'{len(worker.current_running_retry_list)} retry task(s) cancelled')
-    await worker.clear_queue()
+    count_urls = len(worker.current_running_retry_list)
+
+    count_urls_filtered = await worker.add_task_batch(worker.current_running_retry_list, message.chat.id, message.message_id)
     worker.current_running_retry_list.clear()
+
+    await message.reply(f'{count_urls} video(s) in current retry list\n'
+                        f'{count_urls - count_urls_filtered} video(s) skipped\n'
+                        f'{count_urls_filtered} task(s) added')
 
 
 @dp.message_handler(commands=['stat'])
@@ -68,6 +72,15 @@ async def _(message: Message):
                         f'saved unavailable video(s): {get_unavailable_videos_count()}\n'
                         f'notify on success: {worker.current_running_reply_on_success}\n'
                         f'notify on failure: {worker.current_running_reply_on_failure}')
+
+
+@dp.message_handler(commands=['clear'])
+@superuser_required
+async def _(message: Message):
+    await message.reply(f'{worker.get_queue_size()} pending task(s) cancelled\n'
+                        f'{len(worker.current_running_retry_list)} retry task(s) cancelled')
+    await worker.clear_queue()
+    worker.current_running_retry_list.clear()
 
 
 @dp.message_handler(commands=['add_list'])
@@ -159,19 +172,6 @@ async def _(message: Message):
                             parse_mode=ParseMode.MARKDOWN_V2)
 
 
-@dp.message_handler(commands=['retry'])
-@superuser_required
-async def _(message: Message):
-    count_urls = len(worker.current_running_retry_list)
-
-    count_urls_filtered = await worker.add_task_batch(worker.current_running_retry_list, message.chat.id, message.message_id)
-    worker.current_running_retry_list.clear()
-
-    await message.reply(f'{count_urls} video(s) in current retry list\n'
-                        f'{count_urls - count_urls_filtered} video(s) skipped\n'
-                        f'{count_urls_filtered} task(s) added')
-
-
 @dp.message_handler(commands=['toggle_reply_on_success'])
 @superuser_required
 async def _(message: Message):
@@ -214,14 +214,14 @@ async def on_startup(dp_: Dispatcher) -> None:
     await dp_.bot.set_my_commands([
         BotCommand('start', 'hello'),
         BotCommand('check', 'check all videos whether they are still available'),
-        BotCommand('clear', 'clear both retry and pending tasks'),
+        BotCommand('retry', 'retry all videos with network error'),
         BotCommand('stat', 'show statistics'),
+        BotCommand('clear', 'clear both retry and pending tasks'),
         BotCommand('add_list', 'add all videos in a playlist'),
         BotCommand('add_holoinfo', 'add 100 videos from holoinfo'),
         BotCommand('add_channel', 'all the videos uploaded by the channel'),
         BotCommand('add_subscription', 'add recent subscription feeds'),
         BotCommand('add_extra_subscription', 'add channel into separated subscription list'),
-        BotCommand('retry', 'retry all videos with network error'),
         BotCommand('toggle_reply_on_success', 'change success notification setting'),
         BotCommand('toggle_reply_on_failure', 'change failure notification setting'),
     ])
