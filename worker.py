@@ -287,7 +287,15 @@ class SchedulerManager(object):
         """start scheduler"""
         self.scheduler.start()
 
-    def on_error(self, event: JobExecutionEvent):
+    def stop(self) -> None:
+        """stop scheduler"""
+        self.scheduler.shutdown()
+
+    def get_running_status(self) -> bool:
+        """return if scheduler is running"""
+        return self.scheduler.running
+
+    def on_error(self, event: JobExecutionEvent) -> None:
         """handle error during execute tasks"""
         job = self.scheduler.get_job(event.job_id)
         exc_class = event.exception.__class__.__name__

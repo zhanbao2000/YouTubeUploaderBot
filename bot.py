@@ -71,7 +71,8 @@ async def _(message: Message):
                         f'extra subscription count: {get_extra_subscriptions_count()}\n'
                         f'saved unavailable video(s): {get_unavailable_videos_count()}\n'
                         f'notify on success: {worker.current_running_reply_on_success}\n'
-                        f'notify on failure: {worker.current_running_reply_on_failure}')
+                        f'notify on failure: {worker.current_running_reply_on_failure}\n'
+                        f'scheduler status: {scheduler_manager.get_running_status()}')
 
 
 @dp.message_handler(commands=['clear'])
@@ -190,6 +191,17 @@ async def _(message: Message):
                         f'on failure: {worker.current_running_reply_on_failure}')
 
 
+@dp.message_handler(commands=['toggle_scheduler'])
+@superuser_required
+async def _(message: Message):
+    if scheduler_manager.get_running_status():
+        scheduler_manager.stop()
+        await message.reply('scheduler stopped')
+    else:
+        scheduler_manager.start()
+        await message.reply('scheduler started')
+
+
 @dp.message_handler(regexp=r'(?:v=|/)([0-9A-Za-z_-]{11}).*')
 @superuser_required
 async def _(message: Message):
@@ -224,6 +236,7 @@ async def on_startup(dp_: Dispatcher) -> None:
         BotCommand('add_extra_subscription', 'add channel into separated subscription list'),
         BotCommand('toggle_reply_on_success', 'change success notification setting'),
         BotCommand('toggle_reply_on_failure', 'change failure notification setting'),
+        BotCommand('toggle_scheduler', 'change scheduler status'),
     ])
 
 
