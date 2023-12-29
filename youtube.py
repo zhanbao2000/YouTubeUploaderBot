@@ -12,7 +12,7 @@ from model.channels import Channels, Channel
 from model.playlistItems import PlaylistItems
 from model.subscriptions import Subscriptions
 from model.videos import Videos
-from utils import format_file_size, convert_date, get_client, escape_markdown, create_video_link
+from utils import format_file_size, convert_date, get_client, create_video_link
 
 
 class Format(object):
@@ -164,22 +164,16 @@ class YouTubeOAuth20Provider(object):
 
 def get_video_caption(video_info: dict) -> str:
     """get the caption generated from video info"""
-
-    # This text will be parsed as ParseMode.MARKDOWN_V2 directly,
-    # so we must first escape any Markdown characters in title, uploader, etc.
-    # Carefully add new characters to this text, make sure they are safe.
-    # If you do want to add Markdown tags, please understand what you are doing.
-
-    title = escape_markdown(video_info['title'])
+    title = video_info['title']
     url = video_info['webpage_url']
-    duration_string = escape_markdown(video_info['duration_string'])
-    uploader = escape_markdown(video_info['uploader'])
+    duration_string = video_info['duration_string']
+    uploader = video_info['uploader']
     uploader_url = video_info['uploader_url']
     upload_date = convert_date(video_info['upload_date'])
-    resolution = escape_markdown(video_info['resolution'])
-    fps = escape_markdown(video_info['fps'])
-    vcodec = escape_markdown(video_info['vcodec'].split('.', 1)[0])
-    acodec = escape_markdown(video_info['acodec'].split('.', 1)[0])
+    resolution = video_info['resolution']
+    fps = video_info['fps']
+    vcodec = video_info['vcodec'].split('.', 1)[0]
+    acodec = video_info['acodec'].split('.', 1)[0]
     asr = int(video_info['asr'] or 0)
     vbr = int(video_info['vbr'] or 0)
     abr = int(video_info['abr'] or 0)

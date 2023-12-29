@@ -1,12 +1,13 @@
-from asyncio import Queue, QueueEmpty, AbstractEventLoop, sleep, create_task
+from asyncio import Queue, QueueEmpty, get_running_loop
 from pathlib import Path
 from traceback import format_exc
 from typing import Iterable, Optional
 
-from aiogram import Bot
-from aiogram.types import Message, ParseMode
 from apscheduler.events import JobExecutionEvent, EVENT_JOB_ERROR
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from pyrogram import Client
+from pyrogram.enums import ParseMode
+from pyrogram.types import Message
 from pytz import timezone
 from yt_dlp.utils import YoutubeDLError
 
@@ -19,17 +20,16 @@ from database import (
 from typedef import Task, RetryReason
 from utils import format_file_size, create_message_link, escape_color, slide_window
 from youtube import (
-    DownloadManager, get_video_caption, get_video_id, get_thumbnail, is_video_available_online_batch,
+    DownloadManager, get_video_caption, get_video_id, is_video_available_online_batch,
     get_all_my_subscription_channel_ids, get_channel_uploads_playlist_id_batch, get_all_video_urls_from_playlist,
-    get_all_stream_urls_from_holoinfo
+    get_all_stream_urls_from_holoinfo, get_thumbnail
 )
 
 
 class VideoWorker(object):
-    def __init__(self, loop: AbstractEventLoop, bot: Bot):
+    def __init__(self, app: Client):
         self.is_working = False
-        self.loop = loop
-        self.bot = bot
+        self.app = app
         self.video_queue: Queue[Task] = Queue()
         self.current_task: Optional[Task] = None
         self.current_running_transfer_files = 0  # total files transferred from startup
@@ -67,7 +67,7 @@ class VideoWorker(object):
         """reply to the message which triggered current task"""
         # if current_task does not provide chat_id or message_id, ignore
         if self.current_task.chat_id and self.current_task.message_id:
-            return await self.bot.send_message(
+            return await self.app.send_message(
                 chat_id=self.current_task.chat_id,
                 reply_to_message_id=self.current_task.message_id,
                 text=text,
@@ -102,7 +102,7 @@ class VideoWorker(object):
         """inform the user that this video had been uploaded"""
         if video_message_id := get_upload_message_id(video_id):  # video_message_id == 0
             await self.reply_failure(f'this video had been [uploaded]({create_message_link(CHAT_ID, video_message_id)})',
-                                     parse_mode='Markdown')
+                                     parse_mode=ParseMode.MARKDOWN)
         else:  # video_message_id != 0
             await self.reply_failure('this video used to be tried to upload, but failed')
 
@@ -115,12 +115,13 @@ class VideoWorker(object):
 
     async def download_video(self, dm: DownloadManager) -> dict:
         """download the video, return the video info"""
-        video_info = await self.loop.run_in_executor(None, dm.download_max_size_2000mb)
+        loop = self.app.loop or get_running_loop()
+        video_info = await loop.run_in_executor(None, dm.download_max_size_2000mb)
 
         if (filesize := dm.file.stat().st_size) >= 2e9:
             dm.file.unlink()
             await self.reply_failure(f'file too big: {format_file_size(filesize)}\ntry downloading smaller format')
-            video_info = await self.loop.run_in_executor(None, dm.download_max_size_1600mb)
+            video_info = await loop.run_in_executor(None, dm.download_max_size_1600mb)
             # if this format is still too big, the video_id will be recorded in db with message_id = 0
 
         return video_info
@@ -128,18 +129,15 @@ class VideoWorker(object):
     async def upload_video(self, file: Path, video_info: dict) -> Message:
         """upload the video and its thumbnail"""
         with open(file, 'rb') as video:
-            await sleep(5)  # avoid 429, see: https://telegra.ph/So-your-bot-is-rate-limited-01-26
-            video_message = await self.bot.send_video(
+            video_message = await self.app.send_video(
                 chat_id=CHAT_ID, video=video,
                 supports_streaming=True, duration=video_info['duration'],
                 width=video_info['width'], height=video_info['height']
             )
-            await sleep(5)
-            await self.bot.send_photo(
+            await self.app.send_photo(
                 chat_id=CHAT_ID, photo=await get_thumbnail(video_info['thumbnail']),
-                caption=get_video_caption(video_info), parse_mode=ParseMode.MARKDOWN_V2,
-                reply_to_message_id=video_message.message_id
-            )  # use ParseMode.MARKDOWN_V2 to safely parse video titles containing markdown characters
+                caption=get_video_caption(video_info), reply_to_message_id=video_message.id
+            )
 
             self.current_running_transfer_files += 1
             self.current_running_transfer_size += file.stat().st_size
@@ -191,7 +189,7 @@ class VideoWorker(object):
             try:
                 video_info = await self.download_video(dm)
                 video_message = await self.upload_video(dm.file, video_info)
-                video_message_id = video_message.message_id
+                video_message_id = video_message.id
 
             except YoutubeDLError as e:
                 await self.on_download_error(dm, e)
@@ -238,12 +236,12 @@ class VideoChecker(object):
 
     async def reply_change(self, video_id: str, text: str) -> None:
         message_link = create_message_link(CHAT_ID, get_upload_message_id(video_id))
-        await self.message.reply(f'{text}: [{video_id}]({message_link})', parse_mode='Markdown')
+        await self.message.reply_text(f'{text}: [{video_id}]({message_link})', quote=True)
 
     async def check_progress(self) -> None:
         self.count_progress += 1
         if self.count_progress % 1000 == 0:
-            await self.message.reply(f'progress: {self.count_progress}/{self.count_all}')
+            await self.message.reply_text(f'progress: {self.count_progress}/{self.count_all}', quote=True)
 
     async def check_video(self, video_id: str, video_available_online: bool, video_available_local: bool) -> None:
         if video_available_online:
@@ -270,9 +268,9 @@ class VideoChecker(object):
 
 class SchedulerManager(object):
 
-    def __init__(self, worker: VideoWorker, bot: Bot):
+    def __init__(self, worker: VideoWorker, app: Client):
         self.worker = worker
-        self.bot = bot
+        self.app = app
         self.scheduler = AsyncIOScheduler()
 
         beijing_tz = timezone('Asia/Shanghai')
@@ -300,13 +298,13 @@ class SchedulerManager(object):
         job = self.scheduler.get_job(event.job_id)
         exc_class = event.exception.__class__.__name__
 
-        create_task(self.reply(f'error on execute this job: {job.name}\n'
-                               f'{exc_class}: {event.exception}\n'
-                               f'next run at: {job.next_run_time}'))
+        self.app.loop.create_task(self.reply(f'error on execute this job: {job.name}\n'
+                                             f'{exc_class}: {event.exception}\n'
+                                             f'next run at: {job.next_run_time}'))
 
     async def reply(self, text: str, **kwargs) -> Message:
         """reply to first admin"""
-        return await self.bot.send_message(chat_id=SUPERUSERS[0], text=text, **kwargs)
+        return await self.app.send_message(chat_id=SUPERUSERS[0], text=text, **kwargs)
 
     async def add_subscription(self) -> None:
         """add recent subscription feeds"""

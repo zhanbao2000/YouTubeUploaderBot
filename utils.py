@@ -1,9 +1,9 @@
-from functools import wraps
 from re import sub
 from typing import Optional, TypeVar, Generator
 
-from aiogram.types import Message
 from httpx import AsyncClient, AsyncHTTPTransport
+from pyrogram import filters
+from pyrogram.types import Message
 
 from config import SUPERUSERS, PROXY
 
@@ -35,24 +35,9 @@ def format_file_size(byte: int) -> str:
     return f'{byte:.2f}PB'
 
 
-def escape_markdown(text: str) -> str:
-    """escape markdown characters"""
-    escape_chars = r'\*_\[\]()~`>#+-=|{}.!'
-    return sub(r'([' + escape_chars + '])', r'\\\1', str(text))
-
-
 def escape_color(text: str) -> str:
     """escape color codes"""
     return sub(r'\x1b\[[0-9;]*m', '', text)
-
-
-def superuser_required(func):
-    @wraps(func)
-    async def wrapper(message: Message, *args, **kwargs):
-        if message.chat.id in SUPERUSERS:
-            return await func(message, *args, **kwargs)
-
-    return wrapper
 
 
 def slide_window(lst: list[T], window_size: int) -> Generator[list[T], None, None]:
@@ -69,3 +54,12 @@ def get_client(proxies: Optional[str] = None, timeout: float = 15, retries: int 
         transport=AsyncHTTPTransport(retries=retries) if retries else None,
         **kwargs
     )
+
+
+def get_args(message: Message) -> str:
+    """get arguments from a message"""
+    _, *args = message.command
+    return ''.join(args)
+
+
+is_superuser = filters.chat(SUPERUSERS)

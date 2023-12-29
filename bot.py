@@ -1,122 +1,130 @@
-from asyncio import get_event_loop
 from pathlib import Path
 
-from aiogram import Bot, Dispatcher
-from aiogram.bot.api import TelegramAPIServer
-from aiogram.types import BotCommand, Message, ParseMode
-from aiogram.utils import executor
+from pyrogram import Client, filters, idle
+from pyrogram.types import BotCommand, Message
 
-from config import BOT_TOKEN, PROXY, DOWNLOAD_ROOT, CHAT_ID
+from config import API_ID, API_HASH, BOT_TOKEN
+from config import DOWNLOAD_ROOT, CHAT_ID
 from database import (
     is_in_database, get_upload_message_id, insert_extra_subscription,
     get_backup_videos_count, get_unavailable_videos_count, get_extra_subscriptions_count,
-    get_all_extra_subscription_channel_ids
+    get_all_extra_subscription_channel_ids,
 )
 from typedef import Task
-from utils import format_file_size, create_message_link, superuser_required, slide_window, escape_markdown
+from utils import format_file_size, create_message_link, slide_window, is_superuser, get_args
 from worker import VideoWorker, VideoChecker, SchedulerManager
 from youtube import (
     get_video_id, get_playlist_id, get_channel_id,
     get_all_video_urls_from_playlist, get_all_stream_urls_from_holoinfo,
-    get_channel_info, get_all_my_subscription_channel_ids, get_channel_uploads_playlist_id_batch, get_channel_uploads_playlist_id,
-    get_channel_id_by_link
+    get_channel_info, get_all_my_subscription_channel_ids, get_channel_uploads_playlist_id_batch,
+    get_channel_id_by_link, get_channel_uploads_playlist_id,
 )
 
-local_server = TelegramAPIServer.from_base('http://localhost:8083')
-bot = Bot(token=BOT_TOKEN, proxy=PROXY, server=local_server)
-dp = Dispatcher(bot)
+app = Client('YouTubeUploaderBot', api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 
-@dp.message_handler(commands=['start'])
-async def _(message: Message):
-    await message.reply('hello')
+@app.on_message(filters.command('hello'))
+async def hello(_, message: Message):
+    await message.reply_text('hello', quote=True)
 
 
-@dp.message_handler(commands=['check'])
-@superuser_required
-async def _(message: Message):
+@app.on_message(filters.command('check') & is_superuser)
+async def check(_, message: Message):
     checker = VideoChecker(message)
-    await message.reply(f'start checking, task(s): {checker.count_all}')
+    await message.reply_text(f'start checking, task(s): {checker.count_all}', quote=True)
     await checker.check_videos()
-    await message.reply(f'all checking tasks finished\n'
-                        f'total videos: {checker.count_all}\n'
-                        f'total 🟢: {checker.count_all_available}\n'
-                        f'total 🔴: {checker.count_all_unavailable}\n'
-                        f'🟢 -> 🔴: {checker.count_become_unavailable}\n'
-                        f'🔴 -> 🟢: {checker.count_become_available}')
+    await message.reply_text(
+        text=f'all checking tasks finished\n'
+             f'total videos: {checker.count_all}\n'
+             f'total 🟢: {checker.count_all_available}\n'
+             f'total 🔴: {checker.count_all_unavailable}\n'
+             f'🟢 -> 🔴: {checker.count_become_unavailable}\n'
+             f'🔴 -> 🟢: {checker.count_become_available}',
+        quote=True
+    )
 
 
-@dp.message_handler(commands=['retry'])
-@superuser_required
-async def _(message: Message):
+@app.on_message(filters.command('retry') & is_superuser)
+async def retry(_, message: Message):
     count_urls = len(worker.current_running_retry_list)
 
-    count_urls_filtered = await worker.add_task_batch(worker.current_running_retry_list, message.chat.id, message.message_id)
+    count_urls_filtered = await worker.add_task_batch(worker.current_running_retry_list, message.chat.id, message.id)
     worker.current_running_retry_list.clear()
 
-    await message.reply(f'{count_urls} video(s) in current retry list\n'
-                        f'{count_urls - count_urls_filtered} video(s) skipped\n'
-                        f'{count_urls_filtered} task(s) added')
+    await message.reply_text(
+        text=f'{count_urls} video(s) in current retry list\n'
+             f'{count_urls - count_urls_filtered} video(s) skipped\n'
+             f'{count_urls_filtered} task(s) added',
+        quote=True
+    )
 
 
-@dp.message_handler(commands=['stat'])
-@superuser_required
-async def _(message: Message):
-    await message.reply(f'statistics:\n'
-                        f'transfer file(s): {worker.current_running_transfer_files}\n'
-                        f'transfer size: {format_file_size(worker.current_running_transfer_size)}\n'
-                        f'pending task(s): {worker.get_pending_tasks_count()}\n'
-                        f'retry list size: {len(worker.current_running_retry_list)}\n'
-                        f'backup videos count: {get_backup_videos_count()}\n'
-                        f'extra subscription count: {get_extra_subscriptions_count()}\n'
-                        f'saved unavailable video(s): {get_unavailable_videos_count()}\n'
-                        f'notify on success: {worker.current_running_reply_on_success}\n'
-                        f'notify on failure: {worker.current_running_reply_on_failure}\n'
-                        f'scheduler status: {scheduler_manager.get_running_status()}')
+@app.on_message(filters.command('stat') & is_superuser)
+async def stat(_, message: Message):
+    await message.reply_text(
+        text=f'statistics:\n'
+             f'transfer file(s): {worker.current_running_transfer_files}\n'
+             f'transfer size: {format_file_size(worker.current_running_transfer_size)}\n'
+             f'pending task(s): {worker.get_pending_tasks_count()}\n'
+             f'retry list size: {len(worker.current_running_retry_list)}\n'
+             f'backup videos count: {get_backup_videos_count()}\n'
+             f'extra subscription count: {get_extra_subscriptions_count()}\n'
+             f'saved unavailable video(s): {get_unavailable_videos_count()}\n'
+             f'notify on success: {worker.current_running_reply_on_success}\n'
+             f'notify on failure: {worker.current_running_reply_on_failure}\n'
+             f'scheduler status: {scheduler_manager.get_running_status()}',
+        quote=True
+    )
 
 
-@dp.message_handler(commands=['clear'])
-@superuser_required
-async def _(message: Message):
-    await message.reply(f'{worker.get_queue_size()} pending task(s) cancelled\n'
-                        f'{len(worker.current_running_retry_list)} retry task(s) cancelled')
+@app.on_message(filters.command('clear') & is_superuser)
+async def clear(_, message: Message):
+    await message.reply_text(
+        text=f'{worker.get_queue_size()} pending task(s) cancelled\n'
+             f'{len(worker.current_running_retry_list)} retry task(s) cancelled',
+        quote=True
+    )
     await worker.clear_queue()
     worker.current_running_retry_list.clear()
 
 
-@dp.message_handler(commands=['add_list'])
-@superuser_required
-async def _(message: Message):
-    if not (playlist_id := get_playlist_id(message.get_args())):
+@app.on_message(filters.command('add_list') & is_superuser)
+async def add_list(_, message: Message):
+    url = get_args(message)
+    if not (playlist_id := get_playlist_id(url)):
         return
 
     video_urls = await get_all_video_urls_from_playlist(playlist_id)
     count_urls = len(video_urls)
 
-    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.message_id)
+    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.id)
 
-    await message.reply(f'{count_urls} video(s) in this list\n'
-                        f'{count_urls - count_urls_filtered} video(s) skipped\n'
-                        f'{count_urls_filtered} task(s) added')
+    await message.reply_text(
+        text=f'{count_urls} video(s) in this list\n'
+             f'{count_urls - count_urls_filtered} video(s) skipped\n'
+             f'{count_urls_filtered} task(s) added',
+        quote=True
+    )
 
 
-@dp.message_handler(commands=['add_holoinfo'])
-@superuser_required
-async def _(message: Message):
+@app.on_message(filters.command('add_holoinfo') & is_superuser)
+async def add_holoinfo(_, message: Message):
     video_urls = await get_all_stream_urls_from_holoinfo()
     count_urls = len(video_urls)
 
-    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.message_id)
+    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.id)
 
-    await message.reply(f'{count_urls} video(s) fetched from holoinfo\n'
-                        f'{count_urls - count_urls_filtered} video(s) skipped\n'
-                        f'{count_urls_filtered} task(s) added')
+    await message.reply_text(
+        text=f'{count_urls} video(s) fetched from holoinfo\n'
+             f'{count_urls - count_urls_filtered} video(s) skipped\n'
+             f'{count_urls_filtered} task(s) added',
+        quote=True
+    )
 
 
-@dp.message_handler(commands=['add_channel'])
-@superuser_required
-async def _(message: Message):
-    url = message.get_args()
+@app.on_message(filters.command('add_channel') & is_superuser)
+async def add_channel(_, message: Message):
+    url = get_args(message)
     if not url or not (channel_id := get_channel_id(url) or await get_channel_id_by_link(url)):
         return
 
@@ -124,20 +132,22 @@ async def _(message: Message):
     video_urls = await get_all_video_urls_from_playlist(playlist_id, 'ASMR')
     count_urls = len(video_urls)
 
-    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.message_id)
+    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.id)
 
-    await message.reply(f'{count_urls} ASMR video(s) in this channel\n'
-                        f'{count_urls - count_urls_filtered} video(s) skipped\n'
-                        f'{count_urls_filtered} task(s) added')
+    await message.reply_text(
+        text=f'{count_urls} ASMR video(s) in this channel\n'
+             f'{count_urls - count_urls_filtered} video(s) skipped\n'
+             f'{count_urls_filtered} task(s) added',
+        quote=True
+    )
 
 
-@dp.message_handler(commands=['add_subscription'])
-@superuser_required
-async def _(message: Message):
+@app.on_message(filters.command('add_subscription') & is_superuser)
+async def add_subscription(_, message: Message):
     video_urls = []
     channel_ids = await get_all_my_subscription_channel_ids() + get_all_extra_subscription_channel_ids()
 
-    await message.reply(f'get {len(channel_ids)} channels ({get_extra_subscriptions_count()} in extra)')
+    await message.reply_text(f'get {len(channel_ids)} channels ({get_extra_subscriptions_count()} in extra)', quote=True)
 
     for batch_channel_ids in slide_window(channel_ids, 50):
         playlist_ids = await get_channel_uploads_playlist_id_batch(batch_channel_ids)
@@ -147,108 +157,116 @@ async def _(message: Message):
 
     count_urls = len(video_urls)
 
-    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.message_id)
+    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.id)
 
-    await message.reply(f'{count_urls} video(s) in recent feeds\n'
-                        f'{count_urls - count_urls_filtered} video(s) skipped\n'
-                        f'{count_urls_filtered} task(s) added')
+    await message.reply_text(
+        text=f'{count_urls} video(s) in recent feeds\n'
+             f'{count_urls - count_urls_filtered} video(s) skipped\n'
+             f'{count_urls_filtered} task(s) added',
+        quote=True
+    )
 
 
-@dp.message_handler(commands=['add_extra_subscription'])
-@superuser_required
-async def _(message: Message):
-    url = message.get_args()
+@app.on_message(filters.command('add_extra_subscription') & is_superuser)
+async def add_extra_subscription(_, message: Message):
+    url = get_args(message)
     if not url or not (channel_id := get_channel_id(url) or await get_channel_id_by_link(url)):
         return
 
     if not (channel := await get_channel_info(channel_id)):
-        await message.reply('this channel does not exist')
+        await message.reply_text('this channel does not exist', quote=True)
 
     elif not insert_extra_subscription(channel_id):
-        await message.reply('this channel has been added')
+        await message.reply_text('this channel has been added', quote=True)
 
     else:
-        await message.reply(f'channel added\n'
-                            f'[{escape_markdown(channel.snippet.title)}](https://www.youtube.com/channel/{channel_id})',
-                            parse_mode=ParseMode.MARKDOWN_V2)
+        await message.reply_text(
+            text=f'channel added\n'
+                 f'[{channel.snippet.title}](https://www.youtube.com/channel/{channel_id})',
+            quote=True
+        )
 
 
-@dp.message_handler(commands=['toggle_reply_on_success'])
-@superuser_required
-async def _(message: Message):
+@app.on_message(filters.command('toggle_reply_on_success') & is_superuser)
+async def toggle_reply_on_success(_, message: Message):
     worker.current_running_reply_on_success = not worker.current_running_reply_on_success
-    await message.reply(f'current notification setting\n'
-                        f'on success: {worker.current_running_reply_on_success}\n'
-                        f'on failure: {worker.current_running_reply_on_failure}')
+    await message.reply_text(
+        text=f'current notification setting\n'
+             f'on success: {worker.current_running_reply_on_success}\n'
+             f'on failure: {worker.current_running_reply_on_failure}',
+        quote=True
+    )
 
 
-@dp.message_handler(commands=['toggle_reply_on_failure'])
-@superuser_required
-async def _(message: Message):
+@app.on_message(filters.command('toggle_reply_on_failure') & is_superuser)
+async def toggle_reply_on_failure(_, message: Message):
     worker.current_running_reply_on_failure = not worker.current_running_reply_on_failure
-    await message.reply(f'current notification setting\n'
-                        f'on success: {worker.current_running_reply_on_success}\n'
-                        f'on failure: {worker.current_running_reply_on_failure}')
+    await message.reply_text(
+        text=f'current notification setting\n'
+             f'on success: {worker.current_running_reply_on_success}\n'
+             f'on failure: {worker.current_running_reply_on_failure}',
+        quote=True
+    )
 
 
-@dp.message_handler(commands=['toggle_scheduler'])
-@superuser_required
-async def _(message: Message):
+@app.on_message(filters.command('toggle_scheduler') & is_superuser)
+async def toggle_scheduler(_, message: Message):
     if scheduler_manager.get_running_status():
         scheduler_manager.stop()
-        await message.reply('scheduler stopped')
+        await message.reply_text('scheduler stopped', quote=True)
     else:
         scheduler_manager.start()
-        await message.reply('scheduler started')
+        await message.reply_text('scheduler started', quote=True)
 
 
-@dp.message_handler(regexp=r'(?:v=|/)([0-9A-Za-z_-]{11}).*')
-@superuser_required
-async def _(message: Message):
+@app.on_message(filters.regex(r'(?:youtube\.com/(?:watch\?v=|live/)|youtu\.be/)([0-9A-Za-z_-]{11})') & is_superuser)
+async def youtube_url_regex(_, message: Message):
     url = str(message.text)
     video_id = get_video_id(url)
 
     if is_in_database(video_id):
 
         if video_message_id := get_upload_message_id(video_id):  # video_message_id != 0
-            await message.reply(f'this video had been [uploaded]({create_message_link(CHAT_ID, video_message_id)})',
-                                parse_mode='Markdown')
+            await message.reply_text(
+                text=f'this video had been [uploaded]({create_message_link(CHAT_ID, video_message_id)})',
+                quote=True
+            )
         else:  # video_message_id == 0
-            await message.reply('this video used to be tried to upload, but failed')
+            await message.reply_text('this video used to be tried to upload, but failed', quote=True)
 
         return
 
-    await worker.add_task(Task(url, message.chat.id, message.message_id))
-    await message.reply(f'task added\ntotal task(s): {worker.get_pending_tasks_count()}')
-
-
-async def on_startup(dp_: Dispatcher) -> None:
-    await dp_.bot.set_my_commands([
-        BotCommand('start', 'hello'),
-        BotCommand('check', 'check all videos whether they are still available'),
-        BotCommand('retry', 'retry all videos with network error'),
-        BotCommand('stat', 'show statistics'),
-        BotCommand('clear', 'clear both retry and pending tasks'),
-        BotCommand('add_list', 'add all videos in a playlist'),
-        BotCommand('add_holoinfo', 'add 100 videos from holoinfo'),
-        BotCommand('add_channel', 'all the videos uploaded by the channel'),
-        BotCommand('add_subscription', 'add recent subscription feeds'),
-        BotCommand('add_extra_subscription', 'add channel into separated subscription list'),
-        BotCommand('toggle_reply_on_success', 'change success notification setting'),
-        BotCommand('toggle_reply_on_failure', 'change failure notification setting'),
-        BotCommand('toggle_scheduler', 'change scheduler status'),
-    ])
+    await worker.add_task(Task(url, message.chat.id, message.id))
+    await message.reply_text(f'task added\ntotal task(s): {worker.get_pending_tasks_count()}', quote=True)
 
 
 if __name__ == '__main__':
+    app.start()
+
+    app.set_bot_commands([
+        BotCommand(command='hello', description='hello'),
+        BotCommand(command='check', description='check all videos whether they are still available'),
+        BotCommand(command='retry', description='retry all videos with network error'),
+        BotCommand(command='stat', description='show statistics'),
+        BotCommand(command='clear', description='clear both retry and pending tasks'),
+        BotCommand(command='add_list', description='add all videos in a playlist'),
+        BotCommand(command='add_holoinfo', description='add 100 videos from holoinfo'),
+        BotCommand(command='add_channel', description='all the videos uploaded by the channel'),
+        BotCommand(command='add_subscription', description='add recent subscription feeds'),
+        BotCommand(command='add_extra_subscription', description='add channel into separated subscription list'),
+        BotCommand(command='toggle_reply_on_success', description='change success notification setting'),
+        BotCommand(command='toggle_reply_on_failure', description='change failure notification setting'),
+        BotCommand(command='toggle_scheduler', description='change scheduler status'),
+    ])
+
     downloads_dir = Path(DOWNLOAD_ROOT)
     if not downloads_dir.exists():
         downloads_dir.mkdir()
 
-    global_loop = get_event_loop()
-    worker = VideoWorker(global_loop, bot)
-    global_loop.create_task(worker.work())
-    scheduler_manager = SchedulerManager(worker, bot)
+    worker = VideoWorker(app)
+    app.loop.create_task(worker.work())
+    scheduler_manager = SchedulerManager(worker, app)
     scheduler_manager.start()
 
-    executor.start_polling(dp, skip_updates=True, on_startup=on_startup)
+    idle()
+    app.stop(block=False)
