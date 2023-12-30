@@ -20,7 +20,7 @@ from database import (
 from typedef import Task, RetryReason, VideoStatus, HashTag
 from utils import (
     format_file_size, create_message_link, escape_color, slide_window,
-    offset_entities, escape_hashtag, create_video_link,
+    offset_text_link_entities, escape_hashtag, create_video_link,
 )
 from youtube import (
     DownloadManager, get_video_caption, get_video_id, is_video_available_online_batch,
@@ -232,14 +232,16 @@ class VideoChecker(object):
     async def edit_video_caption(self, message_id: int, video_status: VideoStatus) -> None:
         message = await self.app.get_messages(CHAT_ID, message_id)
         entities = message.caption_entities
-        raw = escape_hashtag(message.caption)
-        edited = f'{HashTag[video_status]}\n{raw}'
+        edited_caption = f'{HashTag[video_status]}\n{escape_hashtag(message.caption)}'
+
+        if edited_caption == message.caption:
+            return
 
         await self.app.edit_message_caption(
             chat_id=CHAT_ID, message_id=message_id,
-            caption=edited,
+            caption=edited_caption,
             parse_mode=ParseMode.MARKDOWN,
-            caption_entities=offset_entities(entities, len(edited) - len(raw))
+            caption_entities=offset_text_link_entities(entities, len(edited_caption) - len(message.caption))
         )
 
     async def handle_become_available(self, video_id: str) -> None:

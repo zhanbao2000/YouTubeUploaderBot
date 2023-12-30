@@ -5,6 +5,7 @@ from typing import Optional, TypeVar, Generator
 
 from httpx import AsyncClient, AsyncHTTPTransport, Request
 from pyrogram import filters
+from pyrogram.enums import MessageEntityType
 from pyrogram.types import Message, MessageEntity
 
 from config import SUPERUSERS, PROXY
@@ -99,10 +100,11 @@ def get_args(message: Message) -> str:
     return ''.join(args)
 
 
-def offset_entities(entities: list[MessageEntity], offset: int) -> list[MessageEntity]:
+def offset_text_link_entities(entities: list[MessageEntity], offset: int) -> list[MessageEntity]:
     """offset message entities"""
     for entity in entities:
-        entity.offset += offset
+        if entity.type is MessageEntityType.TEXT_LINK:
+            entity.offset += offset
     return entities
 
 
