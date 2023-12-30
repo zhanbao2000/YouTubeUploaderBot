@@ -30,7 +30,7 @@ async def hello(_, message: Message):
 
 @app.on_message(filters.command('check') & is_superuser)
 async def check(_, message: Message):
-    checker = VideoChecker(message)
+    checker = VideoChecker(message, app)
     await message.reply_text(f'start checking, task(s): {checker.count_all}', quote=True)
     await checker.check_videos()
     await message.reply_text(

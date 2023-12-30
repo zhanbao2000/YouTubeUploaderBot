@@ -12,6 +12,7 @@ from model.channels import Channels, Channel
 from model.playlistItems import PlaylistItems
 from model.subscriptions import Subscriptions
 from model.videos import Videos
+from typedef import VideoStatus
 from utils import format_file_size, convert_date, get_client, create_video_link
 
 
@@ -111,6 +112,31 @@ class DownloadManager(object):
 
         with YoutubeDL(ydl_options) as ydl:
             return ydl.extract_info(self.url, download=False)
+
+    def get_video_status(self) -> VideoStatus:
+        """get remote video status"""
+        try:
+            self.get_video_info()
+        except YoutubeDLError as e:
+            msg = e.msg
+            if 'Sign in if you\'ve been granted access to this video' in msg:
+                result = VideoStatus.VIDEO_PRIVATE
+            elif 'This video has been removed by the uploader' in msg:
+                result = VideoStatus.VIDEO_DELETED
+            elif 'This video is no longer available because the YouTube account associated with this video has been terminated' in msg:
+                result = VideoStatus.ACCOUNT_TERMINATED
+            # elif '' in msg:
+            #     result = VideoStatus.ACCOUNT_CLOSED
+            elif 'This video has been removed for violating YouTube\'s policy on nudity or sexual content' in msg:
+                result = VideoStatus.NUDITY_OR_SEXUAL_CONTENT
+            elif 'Join this channel to get access to members-only content like this video, and other exclusive perks' in msg:
+                result = VideoStatus.MEMBERS_ONLY
+            else:
+                result = VideoStatus.UNAVAILABLE
+        else:
+            result = VideoStatus.AVAILABLE
+
+        return result
 
     def download_max_size_2000mb(self) -> dict:
         """download the largest video but no bigger than 2000 MB"""

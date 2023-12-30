@@ -14,11 +14,14 @@ from yt_dlp.utils import YoutubeDLError
 from config import DOWNLOAD_ROOT, CHAT_ID, SUPERUSERS
 from database import (
     insert_uploaded, is_in_database,
-    get_upload_message_id, update_available, is_available, get_all_video_ids,
+    get_upload_message_id, update_status, get_status, get_all_video_ids,
     get_all_extra_subscription_channel_ids
 )
-from typedef import Task, RetryReason
-from utils import format_file_size, create_message_link, escape_color, slide_window
+from typedef import Task, RetryReason, VideoStatus, HashTag
+from utils import (
+    format_file_size, create_message_link, escape_color, slide_window,
+    offset_entities, escape_hashtag, create_video_link,
+)
 from youtube import (
     DownloadManager, get_video_caption, get_video_id, is_video_available_online_batch,
     get_all_my_subscription_channel_ids, get_channel_uploads_playlist_id_batch, get_all_video_urls_from_playlist,
@@ -177,7 +180,7 @@ class VideoWorker(object):
         """main work loop"""
         while True:
             self.current_task = await self.video_queue.get()
-            video_message_id = None
+            video_message_id = 0
             dm = DownloadManager(self.current_task.url)
 
             if is_in_database(dm.video_id):
@@ -213,8 +216,10 @@ class VideoWorker(object):
 
 
 class VideoChecker(object):
-    def __init__(self, message: Message):
+    def __init__(self, message: Message, app: Client, verbose: bool = False):
         self.message = message
+        self.app = app
+        self.verbose = verbose
         self.video_ids = get_all_video_ids()
 
         self.count_all = len(self.video_ids)
@@ -224,17 +229,34 @@ class VideoChecker(object):
         self.count_all_available = 0
         self.count_all_unavailable = 0
 
+    async def edit_video_caption(self, message_id: int, video_status: VideoStatus) -> None:
+        message = await self.app.get_messages(CHAT_ID, message_id)
+        entities = message.caption_entities
+        raw = escape_hashtag(message.caption)
+        edited = f'{HashTag[video_status]}\n{raw}'
+
+        await self.app.edit_message_caption(
+            chat_id=CHAT_ID, message_id=message_id,
+            caption=edited,
+            parse_mode=ParseMode.MARKDOWN,
+            caption_entities=offset_entities(entities, len(edited) - len(raw))
+        )
+
     async def handle_become_available(self, video_id: str) -> None:
         self.count_become_available += 1
-        update_available(video_id, True)
+        update_status(video_id, VideoStatus.AVAILABLE)
         await self.reply_change(video_id, 'detected a video is available again')
+        await self.edit_video_caption(get_upload_message_id(video_id), VideoStatus.AVAILABLE)
 
-    async def handle_become_not_available(self, video_id: str) -> None:
+    async def handle_become_not_available(self, video_id: str, video_status: VideoStatus) -> None:
         self.count_become_unavailable += 1
-        update_available(video_id, False)
-        await self.reply_change(video_id, 'detected new unavailable video')
+        update_status(video_id, video_status)
+        await self.reply_change(video_id, f'detected new unavailable video\n{video_status}')
+        await self.edit_video_caption(get_upload_message_id(video_id), video_status)
 
     async def reply_change(self, video_id: str, text: str) -> None:
+        if not self.verbose:
+            return
         message_link = create_message_link(CHAT_ID, get_upload_message_id(video_id))
         await self.message.reply_text(f'{text}: [{video_id}]({message_link})', quote=True)
 
@@ -243,16 +265,17 @@ class VideoChecker(object):
         if self.count_progress % 1000 == 0:
             await self.message.reply_text(f'progress: {self.count_progress}/{self.count_all}', quote=True)
 
-    async def check_video(self, video_id: str, video_available_online: bool, video_available_local: bool) -> None:
+    async def check_video(self, video_id: str, video_available_online: bool, video_status_local: VideoStatus) -> None:
         if video_available_online:
             self.count_all_available += 1
         else:
             self.count_all_unavailable += 1
 
-        if video_available_online and not video_available_local:
+        if video_available_online and video_status_local != VideoStatus.AVAILABLE:
             await self.handle_become_available(video_id)
-        elif not video_available_online and video_available_local:
-            await self.handle_become_not_available(video_id)
+        elif not video_available_online and video_status_local == VideoStatus.AVAILABLE:
+            video_status = DownloadManager(create_video_link(video_id)).get_video_status()
+            await self.handle_become_not_available(video_id, video_status)
 
     async def check_videos(self) -> None:
         for batch_video_ids in slide_window(self.video_ids, 50):
@@ -260,10 +283,10 @@ class VideoChecker(object):
 
             for video_id in batch_video_ids:
                 video_available_online = batch_availability[video_id]
-                video_available_local = is_available(video_id)
+                video_status_local = get_status(video_id)
 
                 await self.check_progress()
-                await self.check_video(video_id, video_available_online, video_available_local)
+                await self.check_video(video_id, video_available_online, video_status_local)
 
 
 class SchedulerManager(object):

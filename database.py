@@ -1,6 +1,8 @@
 import sqlite3
 from typing import Optional
 
+from typedef import VideoStatus
+
 
 class Connect:
 
@@ -30,8 +32,9 @@ def is_in_database(video_id: str) -> bool:
 def insert_uploaded(video_id: str, message_id: Optional[int]) -> None:
     """insert a video into database, and record the message_id of the video message"""
     with Connect('database.dat') as c:
-        status = 0 if message_id else -1  # upload error, set status to -1
-        c.execute('INSERT INTO video (video_id, message_id, status) VALUES (?, ?, ?)', (video_id, message_id, status))
+        video_status = VideoStatus.AVAILABLE if message_id else VideoStatus.ERROR_ON_UPLOADING
+        c.execute('INSERT INTO video (video_id, message_id, status) VALUES (?, ?, ?)',
+                  (video_id, message_id, video_status))
 
 
 def insert_extra_subscription(channel_id: str) -> bool:
@@ -44,26 +47,25 @@ def insert_extra_subscription(channel_id: str) -> bool:
         return False
 
 
-def update_available(video_id: str, available: bool) -> None:
+def update_status(video_id: str, video_status: VideoStatus) -> None:
     """set a video as unavailable"""
     with Connect('database.dat') as c:
-        status = 0 if available else -2
-        c.execute("UPDATE video SET status = ?, delete_ts = datetime('now','localtime') WHERE video_id = ?",
-                  (status, video_id,))
+        c.execute("UPDATE video SET status = ?, update_ts = datetime('now','localtime') WHERE video_id = ?",
+                  (video_status, video_id,))
 
 
-def is_available(video_id: str) -> bool:
+def get_status(video_id: str) -> VideoStatus:
     """check if a video is unavailable"""
     with Connect('database.dat') as c:
         c.execute('SELECT status FROM video WHERE video_id = ?', (video_id,))
         result = c.fetchone()
-    return result[0] != -2 if result else False
+    return VideoStatus(result[0])
 
 
 def get_all_video_ids() -> list[str]:
-    """get all video ids"""
+    """get all video ids, except for videos that have not been uploaded successfully"""
     with Connect('database.dat') as c:
-        c.execute('SELECT video_id FROM video')
+        c.execute('SELECT video_id FROM video WHERE status != ?', (VideoStatus.ERROR_ON_UPLOADING,))
         return [video_id for video_id, in c.fetchall()]
 
 
@@ -74,25 +76,25 @@ def get_all_extra_subscription_channel_ids() -> list[str]:
         return [channel_id for channel_id, in c.fetchall()]
 
 
-def get_upload_message_id(video_id: str) -> Optional[int]:
+def get_upload_message_id(video_id: str) -> int:
     """get the message_id of the message of the video"""
     with Connect('database.dat') as c:
         c.execute('SELECT message_id FROM video WHERE video_id = ?', (video_id,))
         result = c.fetchone()
-    return result[0] if result else None
+    return result[0] if result else 0
 
 
 def get_backup_videos_count() -> int:
-    """get the number of videos in the database"""
+    """get the number of videos in the database, except for videos that have not been uploaded successfully"""
     with Connect('database.dat') as c:
-        c.execute('SELECT COUNT(*) FROM video')
+        c.execute('SELECT COUNT(*) FROM video WHERE status != ?', (VideoStatus.ERROR_ON_UPLOADING,))
         return c.fetchone()[0]
 
 
 def get_unavailable_videos_count() -> int:
     """get the number of unavailable videos"""
     with Connect('database.dat') as c:
-        c.execute('SELECT COUNT(*) FROM video WHERE status = -2')
+        c.execute('SELECT COUNT(*) FROM video WHERE status < 0')
         return c.fetchone()[0]
 
 

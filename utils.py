@@ -3,7 +3,7 @@ from typing import Optional, TypeVar, Generator
 
 from httpx import AsyncClient, AsyncHTTPTransport
 from pyrogram import filters
-from pyrogram.types import Message
+from pyrogram.types import Message, MessageEntity
 
 from config import SUPERUSERS, PROXY
 
@@ -60,6 +60,21 @@ def get_args(message: Message) -> str:
     """get arguments from a message"""
     _, *args = message.command
     return ''.join(args)
+
+
+def offset_entities(entities: list[MessageEntity], offset: int) -> list[MessageEntity]:
+    """offset message entities"""
+    for entity in entities:
+        entity.offset += offset
+    return entities
+
+
+def escape_hashtag(caption: str) -> str:
+    """delete hashtags from caption"""
+    title_index = caption.find('标题')
+    if title_index != -1:
+        return caption[title_index:]
+    return caption
 
 
 is_superuser = filters.chat(SUPERUSERS)
