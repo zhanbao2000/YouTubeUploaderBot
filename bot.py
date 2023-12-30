@@ -1,4 +1,5 @@
 from pathlib import Path
+from textwrap import dedent
 
 from pyrogram import Client, filters, idle
 from pyrogram.types import BotCommand, Message
@@ -11,7 +12,7 @@ from database import (
     get_all_extra_subscription_channel_ids,
 )
 from typedef import Task
-from utils import format_file_size, create_message_link, slide_window, is_superuser, get_args
+from utils import format_file_size, create_message_link, slide_window, is_superuser, get_args, counter
 from worker import VideoWorker, VideoChecker, SchedulerManager
 from youtube import (
     get_video_id, get_playlist_id, get_channel_id,
@@ -62,17 +63,31 @@ async def retry(_, message: Message):
 @app.on_message(filters.command('stat') & is_superuser)
 async def stat(_, message: Message):
     await message.reply_text(
-        text=f'statistics:\n'
-             f'transfer file(s): {worker.current_running_transfer_files}\n'
-             f'transfer size: {format_file_size(worker.current_running_transfer_size)}\n'
-             f'pending task(s): {worker.get_pending_tasks_count()}\n'
-             f'retry list size: {len(worker.current_running_retry_list)}\n'
-             f'backup videos count: {get_backup_videos_count()}\n'
-             f'extra subscription count: {get_extra_subscriptions_count()}\n'
-             f'saved unavailable video(s): {get_unavailable_videos_count()}\n'
-             f'notify on success: {worker.current_running_reply_on_success}\n'
-             f'notify on failure: {worker.current_running_reply_on_failure}\n'
-             f'scheduler status: {scheduler_manager.get_running_status()}',
+        text=dedent(f'''\
+             statistics:
+
+             transfer
+               transfer files: {worker.current_running_transfer_files}
+               transfer size: {format_file_size(worker.current_running_transfer_size)}
+
+             tasks
+               pending tasks: {worker.get_pending_tasks_count()}
+               retry list size: {len(worker.current_running_retry_list)}
+
+             video count
+               backup videos count: {get_backup_videos_count()}
+               extra subscription count: {get_extra_subscriptions_count()}
+               saved unavailable videos: {get_unavailable_videos_count()}
+
+             switch
+               notify on success: {worker.current_running_reply_on_success}
+               notify on failure: {worker.current_running_reply_on_failure}
+               scheduler status: {scheduler_manager.get_running_status()}
+
+             API calls
+               google api calls (1m): {counter.count_last_minute()}
+               google api calls (1h): {counter.count_last_hour()}
+               google api calls (1d): {counter.count_last_day()}'''),
         quote=True
     )
 

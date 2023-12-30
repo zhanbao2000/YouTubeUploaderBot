@@ -1,13 +1,44 @@
+from collections import deque
 from re import sub
+from time import time
 from typing import Optional, TypeVar, Generator
 
-from httpx import AsyncClient, AsyncHTTPTransport
+from httpx import AsyncClient, AsyncHTTPTransport, Request
 from pyrogram import filters
 from pyrogram.types import Message, MessageEntity
 
 from config import SUPERUSERS, PROXY
 
 T = TypeVar('T')
+
+
+class APIUsageCounter:
+    def __init__(self):
+        self.timestamps = deque()
+
+    def add_timestamp(self):
+        self.timestamps.append(time())
+        # Perform cleanup every 1000 timestamps
+        if len(self.timestamps) % 1000 == 0:
+            self._cleanup()
+
+    def count_last_minute(self):
+        return self._count_last_seconds(60)
+
+    def count_last_hour(self):
+        return self._count_last_seconds(60 * 60)
+
+    def count_last_day(self):
+        return self._count_last_seconds(60 * 60 * 24)
+
+    def _count_last_seconds(self, seconds):
+        cutoff = time() - seconds
+        return sum(1 for ts in self.timestamps if ts >= cutoff)
+
+    def _cleanup(self):
+        cutoff = time() - 60 * 60 * 24  # One day ago
+        while self.timestamps and self.timestamps[0] < cutoff:
+            self.timestamps.popleft()
 
 
 def convert_date(date: str) -> str:
@@ -46,9 +77,15 @@ def slide_window(lst: list[T], window_size: int) -> Generator[list[T], None, Non
         yield lst[start:start + window_size]
 
 
+async def on_googleapi_call(request: Request):
+    if request.url.host.endswith('googleapis.com'):
+        counter.add_timestamp()
+
+
 def get_client(proxies: Optional[str] = None, timeout: float = 15, retries: int = 5, **kwargs) -> AsyncClient:
     """get a httpx client"""
     return AsyncClient(
+        event_hooks={'request': [on_googleapi_call]},
         proxies=proxies or PROXY,
         timeout=timeout,
         transport=AsyncHTTPTransport(retries=retries) if retries else None,
@@ -78,3 +115,4 @@ def escape_hashtag(caption: str) -> str:
 
 
 is_superuser = filters.chat(SUPERUSERS)
+counter = APIUsageCounter()
