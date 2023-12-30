@@ -121,6 +121,8 @@ class DownloadManager(object):
             msg = e.msg
             if 'Sign in if you\'ve been granted access to this video' in msg:
                 result = VideoStatus.VIDEO_PRIVATE
+            elif 'This video is private. If the owner of this video has granted you access, please sign in' in msg:
+                result = VideoStatus.VIDEO_PRIVATE
             elif 'This video has been removed by the uploader' in msg:
                 result = VideoStatus.VIDEO_DELETED
             elif 'This video is no longer available because the YouTube account associated with this video has been terminated' in msg:
@@ -131,6 +133,10 @@ class DownloadManager(object):
                 result = VideoStatus.NUDITY_OR_SEXUAL_CONTENT
             elif 'Join this channel to get access to members-only content like this video, and other exclusive perks' in msg:
                 result = VideoStatus.MEMBERS_ONLY
+            elif 'This video is unavailable' in msg:
+                result = VideoStatus.UNAVAILABLE
+            elif 'Video unavailable' in msg:
+                result = VideoStatus.UNAVAILABLE
             else:
                 result = VideoStatus.UNAVAILABLE
         else:
