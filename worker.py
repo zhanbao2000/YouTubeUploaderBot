@@ -251,7 +251,7 @@ class VideoChecker(object):
     async def handle_become_not_available(self, video_id: str, video_status: VideoStatus) -> None:
         self.count_become_unavailable += 1
         update_status(video_id, video_status)
-        await self.reply_change(video_id, f'detected new unavailable video\n{video_status}')
+        await self.reply_change(video_id, f'detected new unavailable video\n{video_status.name}')
         await self.edit_video_caption(get_upload_message_id(video_id), video_status)
 
     async def reply_change(self, video_id: str, text: str) -> None:
