@@ -216,7 +216,7 @@ class VideoWorker(object):
 
 
 class VideoChecker(object):
-    def __init__(self, message: Message, app: Client, verbose: bool = False):
+    def __init__(self, message: Message, app: Client, verbose: bool = True):
         self.message = message
         self.app = app
         self.verbose = verbose
