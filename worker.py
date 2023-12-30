@@ -268,6 +268,8 @@ class VideoChecker(object):
             await self.message.reply_text(f'progress: {self.count_progress}/{self.count_all}', quote=True)
 
     async def check_video(self, video_id: str, video_available_online: bool, video_status_local: VideoStatus) -> None:
+        loop = self.app.loop or get_running_loop()
+
         if video_available_online:
             self.count_all_available += 1
         else:
@@ -276,7 +278,7 @@ class VideoChecker(object):
         if video_available_online and video_status_local != VideoStatus.AVAILABLE:
             await self.handle_become_available(video_id)
         elif not video_available_online and video_status_local == VideoStatus.AVAILABLE:
-            video_status = DownloadManager(create_video_link(video_id)).get_video_status()
+            video_status = await loop.run_in_executor(None, DownloadManager(create_video_link(video_id)).get_video_status)
             await self.handle_become_not_available(video_id, video_status)
 
     async def check_videos(self) -> None:
