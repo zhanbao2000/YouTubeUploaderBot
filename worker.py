@@ -154,7 +154,8 @@ class VideoWorker(object):
             'The read operation timed out',
             'Connection reset by peer',
             'HTTP Error 503: Service Unavailable',
-            'The handshake operation timed out'
+            'The handshake operation timed out',
+            'Read timed out'
         )
         live_not_started_error_tokens = (
             'Premieres in',
