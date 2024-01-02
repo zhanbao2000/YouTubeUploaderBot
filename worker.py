@@ -1,4 +1,4 @@
-from asyncio import Queue, QueueEmpty, get_running_loop
+from asyncio import Queue, QueueEmpty, get_running_loop, sleep
 from pathlib import Path
 from traceback import format_exc
 from typing import Iterable, Optional
@@ -245,12 +245,14 @@ class VideoChecker(object):
         )
 
     async def handle_become_available(self, video_id: str) -> None:
+        await sleep(3)
         self.count_become_available += 1
         update_status(video_id, VideoStatus.AVAILABLE)
         await self.reply_change(video_id, 'detected a video is available again')
         await self.edit_video_caption(get_upload_message_id(video_id), VideoStatus.AVAILABLE)
 
     async def handle_become_not_available(self, video_id: str, video_status: VideoStatus) -> None:
+        await sleep(3)
         self.count_become_unavailable += 1
         update_status(video_id, video_status)
         await self.reply_change(video_id, f'detected new unavailable video\n{video_status.name}')
