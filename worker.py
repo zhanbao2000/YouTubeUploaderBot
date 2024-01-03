@@ -137,7 +137,7 @@ class VideoWorker(object):
                 supports_streaming=True, duration=video_info['duration'],
                 width=video_info['width'], height=video_info['height']
             )
-            await self.app.send_photo(
+            photo_message = await self.app.send_photo(
                 chat_id=CHAT_ID, photo=await get_thumbnail(video_info['thumbnail']),
                 caption=get_video_caption(video_info), reply_to_message_id=video_message.id
             )
@@ -145,7 +145,7 @@ class VideoWorker(object):
             self.current_running_transfer_files += 1
             self.current_running_transfer_size += file.stat().st_size
 
-            return video_message
+            return photo_message
 
     async def on_download_error(self, dm: DownloadManager, e: YoutubeDLError) -> None:
         """handle download error"""
@@ -181,7 +181,7 @@ class VideoWorker(object):
         """main work loop"""
         while True:
             self.current_task = await self.video_queue.get()
-            video_message_id = 0
+            photo_message_id = 0
             dm = DownloadManager(self.current_task.url)
 
             if is_in_database(dm.video_id):
@@ -192,8 +192,8 @@ class VideoWorker(object):
 
             try:
                 video_info = await self.download_video(dm)
-                video_message = await self.upload_video(dm.file, video_info)
-                video_message_id = video_message.id
+                photo_message = await self.upload_video(dm.file, video_info)
+                photo_message_id = photo_message.id
 
             except YoutubeDLError as e:
                 await self.on_download_error(dm, e)
@@ -208,7 +208,7 @@ class VideoWorker(object):
                 if dm.file.exists():
                     # if file exists, but upload failed, message_id will be 0
                     # make sure video_id is not in database before insert
-                    insert_uploaded(dm.video_id, video_message_id)
+                    insert_uploaded(dm.video_id, photo_message_id)
                     dm.file.unlink()
 
                 await self.clear_download_folder()
