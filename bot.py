@@ -4,8 +4,7 @@ from textwrap import dedent
 from pyrogram import Client, filters, idle
 from pyrogram.types import BotCommand, Message
 
-from config import API_ID, API_HASH, BOT_TOKEN
-from config import DOWNLOAD_ROOT, CHAT_ID
+from config import API_ID, API_HASH, BOT_TOKEN, DOWNLOAD_ROOT, CHAT_ID
 from database import (
     is_in_database, get_upload_message_id, insert_extra_subscription,
     get_backup_videos_count, get_unavailable_videos_count, get_extra_subscriptions_count,
