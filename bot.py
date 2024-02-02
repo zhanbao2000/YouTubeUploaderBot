@@ -227,11 +227,11 @@ async def toggle_reply_on_failure(_, message: Message):
 @app.on_message(filters.command('toggle_scheduler') & is_superuser)
 async def toggle_scheduler(_, message: Message):
     if scheduler_manager.get_running_status():
-        scheduler_manager.stop()
-        await message.reply_text('scheduler stopped', quote=True)
+        scheduler_manager.pause()
+        await message.reply_text('scheduler paused', quote=True)
     else:
-        scheduler_manager.start()
-        await message.reply_text('scheduler started', quote=True)
+        scheduler_manager.resume()
+        await message.reply_text('scheduler resumed', quote=True)
 
 
 @app.on_message(filters.regex(r'(?:youtube\.com/(?:watch\?v=|live/)|youtu\.be/)([0-9A-Za-z_-]{11})') & is_superuser)
@@ -281,7 +281,6 @@ if __name__ == '__main__':
     worker = VideoWorker(app)
     app.loop.create_task(worker.work())
     scheduler_manager = SchedulerManager(worker, app)
-    scheduler_manager.start()
 
     idle()
     app.stop(block=False)

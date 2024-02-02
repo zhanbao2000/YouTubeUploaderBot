@@ -5,6 +5,7 @@ from typing import Iterable, Optional
 
 from apscheduler.events import JobExecutionEvent, EVENT_JOB_ERROR
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.base import STATE_PAUSED
 from pyrogram import Client
 from pyrogram.enums import ParseMode
 from pyrogram.types import Message
@@ -310,18 +311,19 @@ class SchedulerManager(object):
         self.scheduler.add_job(self.retry, 'cron', hour='6,9,12', timezone=beijing_tz)
 
         self.scheduler.add_listener(self.on_error, EVENT_JOB_ERROR)
-
-    def start(self) -> None:
-        """start scheduler"""
         self.scheduler.start()
 
-    def stop(self) -> None:
+    def pause(self) -> None:
+        """pause scheduler"""
+        self.scheduler.pause()
+
+    def resume(self) -> None:
         """stop scheduler"""
-        self.scheduler.shutdown()
+        self.scheduler.resume()
 
     def get_running_status(self) -> bool:
         """return if scheduler is running"""
-        return self.scheduler.running
+        return self.scheduler.state != STATE_PAUSED
 
     def on_error(self, event: JobExecutionEvent) -> None:
         """handle error during execute tasks"""
