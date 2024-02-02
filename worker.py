@@ -98,7 +98,7 @@ class VideoWorker(object):
             return await self.reply(text, **kwargs)
 
     async def reply_failure(self, text: str, **kwargs) -> Optional[Message]:
-        """reply to the message when the video is successfully uploaded"""
+        """reply when the video is failed to upload"""
         if self.current_running_reply_on_failure:
             return await self.reply(text, **kwargs)
 
