@@ -260,7 +260,7 @@ if __name__ == '__main__':
     app.set_bot_commands([
         BotCommand(command='hello', description='hello'),
         BotCommand(command='check', description='check all videos whether they are still available'),
-        BotCommand(command='retry', description='retry all videos with network error'),
+        BotCommand(command='retry', description='retry all videos in retry list'),
         BotCommand(command='stat', description='show statistics'),
         BotCommand(command='clear', description='clear both retry and pending tasks'),
         BotCommand(command='add_list', description='add all videos in a playlist'),

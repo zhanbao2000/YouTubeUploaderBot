@@ -357,6 +357,6 @@ class SchedulerManager(object):
         await self.worker.add_task_batch(video_urls, None, None)
 
     async def retry(self) -> None:
-        """retry all videos with network error"""
+        """retry all videos in retry list"""
         await self.worker.add_task_batch(self.worker.current_running_retry_list, None, None)
         self.worker.current_running_retry_list.clear()
