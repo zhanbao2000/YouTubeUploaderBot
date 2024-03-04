@@ -18,7 +18,7 @@ from database import (
     get_upload_message_id, update_status, get_status, get_all_video_ids,
     get_all_extra_subscription_channel_ids
 )
-from typedef import Task, RetryReason, VideoStatus, HashTag
+from typedef import Task, RetryReason, VideoStatus, HashTag, IncompleteTranscodingError
 from utils import (
     format_file_size, create_message_link, escape_color, slide_window,
     offset_text_link_entities, escape_hashtag, create_video_link,
@@ -169,8 +169,8 @@ class VideoWorker(object):
             retry_reason = RetryReason.NETWORK_ERROR
         elif any(token in msg for token in live_not_started_error_tokens):
             retry_reason = RetryReason.LIVE_NOT_STARTED
-        elif 'Inconclusive download format' in msg:
-            retry_reason = RetryReason.INCONCLUSIVE_FORMAT
+        elif isinstance(e, IncompleteTranscodingError):
+            retry_reason = RetryReason.INCOMPLETE_TRANSCODING
 
         if retry_reason:
             self.current_running_retry_list.add(dm.url)

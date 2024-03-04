@@ -1,11 +1,17 @@
 from enum import Enum
 from typing import NamedTuple, Optional
 
+from yt_dlp.utils import YoutubeDLError
+
+
+class IncompleteTranscodingError(YoutubeDLError):
+    msg = 'Transcoding for this video is not yet complete on YouTube servers.'
+
 
 class RetryReason(str, Enum):
     LIVE_NOT_STARTED = 'this live has not yet started'
     NETWORK_ERROR = 'a network error occurs when upload this video'
-    INCONCLUSIVE_FORMAT = 'this video currently only contains inconclusive formats'
+    INCOMPLETE_TRANSCODING = 'transcoding for this video is not yet complete on YouTube servers'
 
 
 class Task(NamedTuple):

@@ -12,7 +12,7 @@ from model.channels import Channels, Channel
 from model.playlistItems import PlaylistItems
 from model.subscriptions import Subscriptions
 from model.videos import Videos
-from typedef import VideoStatus
+from typedef import VideoStatus, IncompleteTranscodingError
 from utils import format_file_size, convert_date, get_client, create_video_link
 
 
@@ -88,7 +88,7 @@ class DownloadManager(object):
                     all(format_.filesize == 0 for format_ in video_formats) or
                     all(format_.filesize == 0 for format_ in audio_formats)
             ):
-                raise YoutubeDLError('Inconclusive download format.')
+                raise IncompleteTranscodingError
 
             # check if duration less than minimum duration
             if video_info['duration'] <= 300:  # 5 min
