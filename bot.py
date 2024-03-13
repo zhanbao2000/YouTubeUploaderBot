@@ -11,7 +11,10 @@ from database import (
     get_all_extra_subscription_channel_ids,
 )
 from typedef import Task
-from utils import format_file_size, create_message_link, slide_window, is_superuser, get_args, counter
+from utils import (
+    format_file_size, create_message_link, slide_window, is_superuser, get_args, counter,
+    get_memory_usage, get_swap_usage
+)
 from worker import VideoWorker, VideoChecker, SchedulerManager
 from youtube import (
     get_video_id, get_playlist_id, get_channel_id,
@@ -61,6 +64,7 @@ async def retry(_, message: Message):
 
 @app.on_message(filters.command('stat') & is_superuser)
 async def stat(_, message: Message):
+    memory_usage = get_memory_usage()
     await message.reply_text(
         text=dedent(f'''\
              statistics:
@@ -86,7 +90,16 @@ async def stat(_, message: Message):
              API calls
                google api calls (1m): {counter.count_last_minute()}
                google api calls (1h): {counter.count_last_hour()}
-               google api calls (1d): {counter.count_last_day()}'''),
+               google api calls (1d): {counter.count_last_day()}
+    
+             memory usage
+               RSS: {format_file_size(memory_usage.rss)}
+               VMS: {format_file_size(memory_usage.vms)}
+               Text: {format_file_size(memory_usage.text)}
+               Lib: {format_file_size(memory_usage.lib)}
+               Data: {format_file_size(memory_usage.data)}
+               Dirty: {format_file_size(memory_usage.dirty)}
+               Swap: {format_file_size(get_swap_usage())}'''),
         quote=True
     )
 

@@ -1,9 +1,11 @@
 from collections import deque
-from re import sub
+from os import getpid
+from re import sub, search
 from time import time
 from typing import Optional, TypeVar, Generator
 
 from httpx import AsyncClient, AsyncHTTPTransport, Request
+from psutil import Process
 from pyrogram import filters
 from pyrogram.enums import MessageEntityType
 from pyrogram.types import Message, MessageEntity
@@ -114,6 +116,24 @@ def escape_hashtag(caption: str) -> str:
     if title_index != -1:
         return caption[title_index:]
     return caption
+
+
+def get_memory_usage():
+    """get memory usage, using psutil library"""
+    process = Process(getpid())
+    return process.memory_info()
+
+
+def get_swap_usage() -> int:
+    """get swap usage, using smaps"""
+    with open(f'/proc/{getpid()}/smaps', 'r') as file:
+        # awk '/^Swap:/ {SWAP+=$2}END{print SWAP" KB"}' /proc/{pid}/smaps
+        swap = sum(
+            int(search(r'\d+', line).group())
+            for line in file
+            if line.startswith('Swap:')
+        )
+    return swap * 1024
 
 
 is_superuser = filters.chat(SUPERUSERS)
