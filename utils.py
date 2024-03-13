@@ -1,5 +1,6 @@
 from collections import deque
 from os import getpid
+from platform import system
 from re import sub, search
 from time import time
 from typing import Optional, TypeVar, Generator
@@ -126,6 +127,9 @@ def get_memory_usage():
 
 def get_swap_usage() -> int:
     """get swap usage, using smaps"""
+    if system() != 'Linux':
+        return 0
+
     with open(f'/proc/{getpid()}/smaps', 'r') as file:
         # awk '/^Swap:/ {SWAP+=$2}END{print SWAP" KB"}' /proc/{pid}/smaps
         swap = sum(
@@ -133,6 +137,7 @@ def get_swap_usage() -> int:
             for line in file
             if line.startswith('Swap:')
         )
+
     return swap * 1024
 
 
