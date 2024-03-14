@@ -1,4 +1,5 @@
 from collections import deque
+from datetime import datetime
 from os import getpid
 from platform import system
 from re import sub, search
@@ -139,6 +140,15 @@ def get_swap_usage() -> int:
         )
 
     return swap * 1024
+
+
+def parse_upload_timestamp(video_info: dict) -> datetime:
+    """parse upload timestamp to datetime object"""
+    if 'release_timestamp' in video_info:
+        return datetime.fromtimestamp(video_info['release_timestamp'])
+    elif 'release_date' in video_info:
+        return datetime.strptime(video_info['release_date'], '%Y%m%d')
+    raise ValueError('No upload timestamp found in video_info')
 
 
 is_superuser = filters.chat(SUPERUSERS)

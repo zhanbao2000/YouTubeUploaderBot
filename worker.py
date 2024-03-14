@@ -183,6 +183,7 @@ class VideoWorker(object):
         while True:
             self.current_task = await self.video_queue.get()
             photo_message_id = 0
+            video_info = dict()
             dm = DownloadManager(self.current_task.url)
 
             if is_in_database(dm.video_id):
@@ -192,7 +193,10 @@ class VideoWorker(object):
             self.is_working = True
 
             try:
+                # if download is successful, the file will exist and video_info will not be an empty dict
+                # if download is failed, YoutubeDLError will be raised and file will not exist
                 video_info = await self.download_video(dm)
+                # if upload is successful, photo_message_id will not be 0, else it will be default value 0
                 photo_message = await self.upload_video(dm.file, video_info)
                 photo_message_id = photo_message.id
 
@@ -206,10 +210,8 @@ class VideoWorker(object):
                 await self.reply_task_done()
 
             finally:
-                if dm.file.exists():
-                    # if file exists, but upload failed, message_id will be 0
-                    # make sure video_id is not in database before insert
-                    insert_uploaded(dm.video_id, photo_message_id)
+                if dm.file.exists() and video_info:
+                    insert_uploaded(dm.video_id, photo_message_id, dm.file.stat().st_size, video_info)
                     dm.file.unlink()
 
                 await self.clear_download_folder()

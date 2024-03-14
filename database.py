@@ -1,7 +1,7 @@
 import sqlite3
-from typing import Optional
 
 from typedef import VideoStatus
+from utils import parse_upload_timestamp
 
 
 class Connect:
@@ -29,12 +29,15 @@ def is_in_database(video_id: str) -> bool:
         return c.fetchone() is not None
 
 
-def insert_uploaded(video_id: str, message_id: Optional[int]) -> None:
+def insert_uploaded(video_id: str, message_id: int, size: int, video_info: dict) -> None:
     """insert a video into database, and record the message_id of the video message"""
     with Connect('database.dat') as c:
-        video_status = VideoStatus.AVAILABLE if message_id else VideoStatus.ERROR_ON_UPLOADING
-        c.execute('INSERT INTO video (video_id, message_id, status) VALUES (?, ?, ?)',
-                  (video_id, message_id, video_status))
+        video_status = VideoStatus.AVAILABLE if message_id != 0 else VideoStatus.ERROR_ON_UPLOADING
+        title = video_info['title']
+        duration = video_info['duration']
+        upload_ts = parse_upload_timestamp(video_info)
+        c.execute('INSERT INTO video (video_id, message_id, title, duration, size, upload_ts, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                  (video_id, message_id, title, duration, size, upload_ts, video_status))
 
 
 def insert_extra_subscription(channel_id: str) -> bool:
