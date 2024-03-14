@@ -8,11 +8,11 @@ from config import API_ID, API_HASH, BOT_TOKEN, DOWNLOAD_ROOT, CHAT_ID
 from database import (
     is_in_database, get_upload_message_id, insert_extra_subscription,
     get_backup_videos_count, get_unavailable_videos_count, get_extra_subscriptions_count,
-    get_all_extra_subscription_channel_ids,
+    get_all_extra_subscription_channel_ids, get_backup_videos_total_size, get_backup_videos_total_duration,
 )
 from typedef import Task
 from utils import (
-    format_file_size, create_message_link, slide_window, is_superuser, get_args, counter,
+    format_file_size, format_duration, create_message_link, slide_window, is_superuser, get_args, counter,
     get_memory_usage, get_swap_usage
 )
 from worker import VideoWorker, VideoChecker, SchedulerManager
@@ -81,6 +81,8 @@ async def stat(_, message: Message):
                backup videos count: {get_backup_videos_count()}
                extra subscription count: {get_extra_subscriptions_count()}
                saved unavailable videos: {get_unavailable_videos_count()}
+               total size: {format_file_size(get_backup_videos_total_size())}
+               total duration: {format_duration(get_backup_videos_total_duration())}
 
              switch
                notify on success: {worker.current_running_reply_on_success}

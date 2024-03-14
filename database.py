@@ -106,3 +106,24 @@ def get_extra_subscriptions_count() -> int:
     with Connect('database.dat') as c:
         c.execute('SELECT COUNT(*) FROM extra_subscription')
         return c.fetchone()[0]
+
+
+def get_video_count_by_status(status: VideoStatus) -> int:
+    """get the number of videos by specific status"""
+    with Connect('database.dat') as c:
+        c.execute('SELECT COUNT(*) FROM video WHERE status = ?', (status,))
+        return c.fetchone()[0]
+
+
+def get_backup_videos_total_size() -> int:
+    """get the total size of videos in the database"""
+    with Connect('database.dat') as c:
+        c.execute('SELECT SUM(size) FROM video')
+        return c.fetchone()[0] or 0
+
+
+def get_backup_videos_total_duration() -> int:
+    """get the total duration of videos in the database"""
+    with Connect('database.dat') as c:
+        c.execute('SELECT SUM(duration) FROM video')
+        return c.fetchone()[0] or 0
