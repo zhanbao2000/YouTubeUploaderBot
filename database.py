@@ -51,14 +51,14 @@ def insert_extra_subscription(channel_id: str) -> bool:
 
 
 def update_status(video_id: str, video_status: VideoStatus) -> None:
-    """set a video as unavailable"""
+    """update the status of a video in the database"""
     with Connect(DATABASE_FILE) as c:
         c.execute("UPDATE video SET status = ?, update_ts = datetime('now','localtime') WHERE video_id = ?",
                   (video_status, video_id,))
 
 
 def get_status(video_id: str) -> VideoStatus:
-    """check if a video is unavailable"""
+    """get the status of a video in the database"""
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT status FROM video WHERE video_id = ?', (video_id,))
         result = c.fetchone()
@@ -66,7 +66,7 @@ def get_status(video_id: str) -> VideoStatus:
 
 
 def get_all_video_ids() -> list[str]:
-    """get all video ids, except for videos that have not been uploaded successfully"""
+    """get all video ids as a list, only for videos that have linked messages"""
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT video_id FROM video WHERE message_id != 0')
         return [video_id for video_id, in c.fetchall()]
@@ -88,7 +88,7 @@ def get_upload_message_id(video_id: str) -> int:
 
 
 def get_backup_videos_count() -> int:
-    """get the number of videos in the database, except for videos that have not been uploaded successfully"""
+    """get the number of videos in the database, only for videos that have linked messages"""
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT COUNT(*) FROM video WHERE message_id != 0')
         return c.fetchone()[0]

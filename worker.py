@@ -21,7 +21,7 @@ from database import (
 from typedef import Task, RetryReason, VideoStatus, HashTag, IncompleteTranscodingError, VideoTooShortError
 from utils import (
     format_file_size, create_message_link, escape_color, slide_window,
-    offset_text_link_entities, escape_hashtag, create_video_link,
+    offset_text_link_entities, escape_hashtag_from_caption, create_video_link,
 )
 from youtube import (
     DownloadManager, get_video_caption, get_video_id, is_video_available_online_batch,
@@ -131,14 +131,14 @@ class VideoWorker(object):
         return video_info
 
     async def upload_video(self, file: Path, video_info: dict) -> Message:
-        """upload the video and its thumbnail"""
+        """upload the video and its thumbnail, return the message of the thumbnail"""
         with open(file, 'rb') as video:
             video_message = await self.app.send_video(
                 chat_id=CHAT_ID, video=video,
                 supports_streaming=True, duration=video_info['duration'],
                 width=video_info['width'], height=video_info['height']
             )
-            photo_message = await self.app.send_photo(
+            thumbnail_message = await self.app.send_photo(
                 chat_id=CHAT_ID, photo=await get_thumbnail(video_info['thumbnail']),
                 caption=get_video_caption(video_info), reply_to_message_id=video_message.id
             )
@@ -146,10 +146,10 @@ class VideoWorker(object):
             self.current_running_transfer_files += 1
             self.current_running_transfer_size += file.stat().st_size
 
-            return photo_message
+            return thumbnail_message
 
     async def on_too_short_video(self, dm: DownloadManager) -> None:
-        """handle too short video error"""
+        """handle error of VideoTooShortError"""
         loop = self.app.loop or get_running_loop()
         # re-get video_info because video_info is None
         video_info = await loop.run_in_executor(None, dm.get_video_info)
@@ -159,7 +159,7 @@ class VideoWorker(object):
         await self.reply_failure(f'error on downloading this video: {dm.video_id}\nToo short video, duration: {duration}\n')
 
     async def on_download_error(self, dm: DownloadManager, e: YoutubeDLError) -> None:
-        """handle download error"""
+        """handle error of YoutubeDLError"""
         msg = escape_color(e.msg)
         network_error_tokens = (
             'The read operation timed out',
@@ -188,14 +188,14 @@ class VideoWorker(object):
         else:
             await self.reply_failure(f'error on downloading this video: {dm.video_id}\n{msg}\n')
 
-    async def on_finish(self, dm: DownloadManager, video_info: Optional[dict], photo_message: Optional[Message]) -> None:
+    async def on_finish(self, dm: DownloadManager, video_info: Optional[dict], thumbnail_message: Optional[Message]) -> None:
         """handle finish event"""
         if video_info is None:  # download failed
             pass
-        elif photo_message is None:  # download successful, upload failed
+        elif thumbnail_message is None:  # download successful, upload failed
             insert_video(dm.video_id, 0, dm.file.stat().st_size, video_info, VideoStatus.ERROR_ON_UPLOADING)
         else:  # both download and upload successful
-            insert_video(dm.video_id, photo_message.id, dm.file.stat().st_size, video_info, VideoStatus.AVAILABLE)
+            insert_video(dm.video_id, thumbnail_message.id, dm.file.stat().st_size, video_info, VideoStatus.AVAILABLE)
 
         dm.file.unlink(missing_ok=True)
 
@@ -217,11 +217,11 @@ class VideoWorker(object):
             # determine whether the download or upload is successful by setting its initial value to None
             # in finally block, if the value is still None, it means the download or upload is failed
             video_info: Optional[dict] = None  # for download
-            photo_message: Optional[Message] = None  # for upload
+            thumbnail_message: Optional[Message] = None  # for upload
 
             try:
                 video_info = await self.download_video(dm)
-                photo_message = await self.upload_video(dm.file, video_info)
+                thumbnail_message = await self.upload_video(dm.file, video_info)
 
             except VideoTooShortError:
                 await self.on_too_short_video(dm)
@@ -236,7 +236,7 @@ class VideoWorker(object):
                 await self.reply_task_done()
 
             finally:
-                await self.on_finish(dm, video_info, photo_message)
+                await self.on_finish(dm, video_info, thumbnail_message)
 
 
 class VideoChecker(object):
@@ -256,7 +256,7 @@ class VideoChecker(object):
     async def edit_video_caption(self, message_id: int, video_status: VideoStatus) -> None:
         message = await self.app.get_messages(CHAT_ID, message_id)
         entities = message.caption_entities
-        edited_caption = f'{HashTag[video_status]}\n{escape_hashtag(message.caption)}'
+        edited_caption = f'{HashTag[video_status]}\n{escape_hashtag_from_caption(message.caption)}'
 
         if edited_caption == message.caption:
             return
@@ -340,7 +340,7 @@ class SchedulerManager(object):
         self.scheduler.pause()
 
     def resume(self) -> None:
-        """stop scheduler"""
+        """resume scheduler"""
         self.scheduler.resume()
 
     def get_running_status(self) -> bool:

@@ -114,7 +114,7 @@ class DownloadManager(object):
             return ydl.extract_info(self.url, download=False)
 
     def get_video_status(self) -> VideoStatus:
-        """get remote video status"""
+        """get video status from YouTube"""
         try:
             self.get_video_info()
         except YoutubeDLError as e:
@@ -195,7 +195,7 @@ class YouTubeOAuth20Provider(object):
 
 
 def get_video_caption(video_info: dict) -> str:
-    """get the caption generated from video info"""
+    """generate caption from video info"""
     title = video_info['title']
     url = video_info['webpage_url']
     duration_string = video_info['duration_string']
@@ -219,19 +219,19 @@ def get_video_caption(video_info: dict) -> str:
 
 
 def get_video_id(url: str) -> Optional[str]:
-    """get video id from url"""
+    """extract video id from url"""
     match = re.search(r'(?:v=|/)([0-9A-Za-z_-]{11}).*', url)
     return match.group(1) if match else None
 
 
 def get_playlist_id(url: str) -> Optional[str]:
-    """get playlist id from url"""
+    """extract playlist id from url"""
     match = re.search(r'(?<=list=)[^&]+', url)
     return match.group(0) if match else None
 
 
 def get_channel_id(url: str) -> Optional[str]:
-    """get channel id from url"""
+    """extract channel id from url"""
     match = re.search(r'(?<=channel/)[^/]+', url)
     return match.group(0) if match else None
 
@@ -269,7 +269,7 @@ def get_formats_list(formats: list[dict]) -> tuple[list[VideoFormat], list[Audio
 
 
 async def get_thumbnail(url: str) -> BytesIO:
-    """get thumbnail of a video"""
+    """download thumbnail of a video, as BytesIO object"""
     async with get_client() as client:
         r = await client.get(url)
         return BytesIO(r.content)
@@ -454,7 +454,7 @@ async def get_all_stream_urls_from_holoinfo(limit: int = 100, max_upcoming_hours
 
 
 async def get_channel_id_by_link(url: str) -> Optional[str]:
-    """get channel id from webpage"""
+    """extract channel id from webpage"""
     async with get_client(follow_redirects=True) as client:
         r = await client.get(url)
 

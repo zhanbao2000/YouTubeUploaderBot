@@ -46,20 +46,20 @@ class APIUsageCounter:
             self.timestamps.popleft()
 
 
-def convert_date(date: str) -> str:
-    """convert date string to human-readable format"""
-    return f'{date[:4]}年{date[4:6]}月{date[6:8]}日'
-
-
 def create_message_link(chat_id: int, message_id: int) -> str:
-    """create a link to a message in a channel"""
+    """create a Telegram message link to a message in a channel"""
     channel_id = str(chat_id).removeprefix('-100')
     return f'https://t.me/c/{channel_id}/{message_id}'
 
 
 def create_video_link(video_id: str) -> str:
-    """create a video link according to video id"""
+    """create a YouTube video link according to video id"""
     return f'https://www.youtube.com/watch?v={video_id}'
+
+
+def convert_date(date: str) -> str:
+    """convert date string to human-readable format"""
+    return f'{date[:4]}年{date[4:6]}月{date[6:8]}日'
 
 
 def format_file_size(byte: int) -> str:
@@ -117,14 +117,14 @@ def get_args(message: Message) -> str:
 
 
 def offset_text_link_entities(entities: list[MessageEntity], offset: int) -> list[MessageEntity]:
-    """offset message entities"""
+    """offset text link entities by a certain amount of characters"""
     for entity in entities:
         if entity.type is MessageEntityType.TEXT_LINK:
             entity.offset += offset
     return entities
 
 
-def escape_hashtag(caption: str) -> str:
+def escape_hashtag_from_caption(caption: str) -> str:
     """delete hashtags from caption"""
     title_index = caption.find('标题')
     if title_index != -1:
@@ -139,7 +139,7 @@ def get_memory_usage():
 
 
 def get_swap_usage() -> int:
-    """get swap usage, using smaps"""
+    """get swap usage, using smaps, if system is not Linux, return 0"""
     if system() != 'Linux':
         return 0
 
