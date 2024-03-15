@@ -12,7 +12,7 @@ from model.channels import Channels, Channel
 from model.playlistItems import PlaylistItems
 from model.subscriptions import Subscriptions
 from model.videos import Videos
-from typedef import VideoStatus, IncompleteTranscodingError
+from typedef import VideoStatus, IncompleteTranscodingError, VideoTooShortError
 from utils import format_file_size, convert_date, get_client, create_video_link
 
 
@@ -92,7 +92,7 @@ class DownloadManager(object):
 
             # check if duration less than minimum duration
             if video_info['duration'] <= 300:  # 5 min
-                raise RuntimeError(f'Too small video, duration: {video_info["duration"]}')
+                raise VideoTooShortError(f'Too small video, duration: {video_info["duration"]}')
 
             ydl.params.update({
                 'skip_download': False,
