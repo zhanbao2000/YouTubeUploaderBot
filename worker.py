@@ -176,14 +176,27 @@ class VideoWorker(object):
             self.current_running_retry_list.add(dm.url)
             await self.reply_failure(f'{retry_reason}: {dm.video_id}\n{msg}\nthis url has been saved to retry list, you can retry it later')
         else:
-            await self.reply_failure(f'error on uploading this video: {dm.video_id}\n{msg}\n')
+            await self.reply_failure(f'error on downloading this video: {dm.video_id}\n{msg}\n')
+
+    async def on_finish(self, dm: DownloadManager, video_info: Optional[dict], photo_message: Optional[Message]) -> None:
+        """handle finish event"""
+        if video_info is None:  # download failed
+            pass
+        elif photo_message is None:  # download successful, upload failed
+            insert_uploaded(dm.video_id, 0, dm.file.stat().st_size, video_info)
+        else:  # both download and upload successful
+            insert_uploaded(dm.video_id, photo_message.id, dm.file.stat().st_size, video_info)
+
+        dm.file.unlink(missing_ok=True)
+
+        await self.clear_download_folder()
+        self.is_working = False
+        self.video_queue.task_done()
 
     async def work(self) -> None:
         """main work loop"""
         while True:
             self.current_task = await self.video_queue.get()
-            photo_message_id = 0
-            video_info = dict()
             dm = DownloadManager(self.current_task.url)
 
             if is_in_database(dm.video_id):
@@ -191,14 +204,14 @@ class VideoWorker(object):
                 continue
 
             self.is_working = True
+            # determine whether the download or upload is successful by setting its initial value to None
+            # in finally block, if the value is still None, it means the download or upload is failed
+            video_info: Optional[dict] = None  # for download
+            photo_message: Optional[Message] = None  # for upload
 
             try:
-                # if download is successful, the file will exist and video_info will not be an empty dict
-                # if download is failed, YoutubeDLError will be raised and file will not exist
                 video_info = await self.download_video(dm)
-                # if upload is successful, photo_message_id will not be 0, else it will be default value 0
                 photo_message = await self.upload_video(dm.file, video_info)
-                photo_message_id = photo_message.id
 
             except YoutubeDLError as e:
                 await self.on_download_error(dm, e)
@@ -210,13 +223,7 @@ class VideoWorker(object):
                 await self.reply_task_done()
 
             finally:
-                if dm.file.exists() and video_info:
-                    insert_uploaded(dm.video_id, photo_message_id, dm.file.stat().st_size, video_info)
-                    dm.file.unlink()
-
-                await self.clear_download_folder()
-                self.is_working = False
-                self.video_queue.task_done()
+                await self.on_finish(dm, video_info, photo_message)
 
 
 class VideoChecker(object):
