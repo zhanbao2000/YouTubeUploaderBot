@@ -14,11 +14,11 @@ from yt_dlp.utils import YoutubeDLError
 
 from config import DOWNLOAD_ROOT, CHAT_ID, SUPERUSERS
 from database import (
-    insert_uploaded, is_in_database,
+    insert_video, is_in_database,
     get_upload_message_id, update_status, get_status, get_all_video_ids,
     get_all_extra_subscription_channel_ids
 )
-from typedef import Task, RetryReason, VideoStatus, HashTag, IncompleteTranscodingError
+from typedef import Task, RetryReason, VideoStatus, HashTag, IncompleteTranscodingError, VideoTooShortError
 from utils import (
     format_file_size, create_message_link, escape_color, slide_window,
     offset_text_link_entities, escape_hashtag, create_video_link,
@@ -148,6 +148,16 @@ class VideoWorker(object):
 
             return photo_message
 
+    async def on_too_short_video(self, dm: DownloadManager) -> None:
+        """handle too short video error"""
+        loop = self.app.loop or get_running_loop()
+        # re-get video_info because video_info is None
+        video_info = await loop.run_in_executor(None, dm.get_video_info)
+        duration = video_info['duration']
+
+        insert_video(dm.video_id, 0, 0, video_info, VideoStatus.TOO_SHORT)
+        await self.reply_failure(f'error on downloading this video: {dm.video_id}\nToo short video, duration: {duration}\n')
+
     async def on_download_error(self, dm: DownloadManager, e: YoutubeDLError) -> None:
         """handle download error"""
         msg = escape_color(e.msg)
@@ -183,9 +193,9 @@ class VideoWorker(object):
         if video_info is None:  # download failed
             pass
         elif photo_message is None:  # download successful, upload failed
-            insert_uploaded(dm.video_id, 0, dm.file.stat().st_size, video_info)
+            insert_video(dm.video_id, 0, dm.file.stat().st_size, video_info, VideoStatus.ERROR_ON_UPLOADING)
         else:  # both download and upload successful
-            insert_uploaded(dm.video_id, photo_message.id, dm.file.stat().st_size, video_info)
+            insert_video(dm.video_id, photo_message.id, dm.file.stat().st_size, video_info, VideoStatus.AVAILABLE)
 
         dm.file.unlink(missing_ok=True)
 
@@ -212,6 +222,9 @@ class VideoWorker(object):
             try:
                 video_info = await self.download_video(dm)
                 photo_message = await self.upload_video(dm.file, video_info)
+
+            except VideoTooShortError:
+                await self.on_too_short_video(dm)
 
             except YoutubeDLError as e:
                 await self.on_download_error(dm, e)

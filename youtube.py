@@ -92,7 +92,7 @@ class DownloadManager(object):
 
             # check if duration less than minimum duration
             if video_info['duration'] <= 300:  # 5 min
-                raise VideoTooShortError(f'Too small video, duration: {video_info["duration"]}')
+                raise VideoTooShortError
 
             ydl.params.update({
                 'skip_download': False,

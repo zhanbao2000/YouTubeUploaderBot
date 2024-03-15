@@ -8,7 +8,7 @@ class IncompleteTranscodingError(YoutubeDLError):
     msg = 'Transcoding for this video is not yet complete on YouTube servers.'
 
 
-class VideoTooShortError(YoutubeDLError):
+class VideoTooShortError(RuntimeError):
     pass
 
 
@@ -25,8 +25,14 @@ class Task(NamedTuple):
 
 
 class VideoStatus(int, Enum):
+    # positive values are available or can be made available
+    TOO_SHORT = 2
     AVAILABLE = 1
+
+    # zero means error on uploading, usually this is because the file size exceeds the Telegram limit
     ERROR_ON_UPLOADING = 0
+
+    # negative values are unavailable from YouTube
     UNAVAILABLE = -1
     VIDEO_PRIVATE = -2
     VIDEO_DELETED = -3
