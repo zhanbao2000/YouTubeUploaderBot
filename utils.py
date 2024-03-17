@@ -73,14 +73,21 @@ def format_file_size(byte: int) -> str:
 
 def format_duration(duration: int) -> str:
     """convert duration to human-readable format"""
-    if duration < 60:
-        return f'{duration}秒'
-    elif duration < 3600:
-        return f'{int(duration / 60)}分钟{duration % 60}秒'
-    elif duration < 86400:
-        return f'{int(duration / 3600)}小时{int((duration % 3600) / 60)}分钟{duration % 60}秒'
+    years, duration = divmod(duration, 60 * 60 * 24 * 365)
+    days, duration = divmod(duration, 60 * 60 * 24)
+    hours, duration = divmod(duration, 60 * 60)
+    minutes, seconds = divmod(duration, 60)
+
+    if years > 0:
+        return f'{years}年{days}天{hours}小时{minutes}分钟{seconds}秒'
+    elif days > 0:
+        return f'{days}天{hours}小时{minutes}分钟{seconds}秒'
+    elif hours > 0:
+        return f'{hours}小时{minutes}分钟{seconds}秒'
+    elif minutes > 0:
+        return f'{minutes}分钟{seconds}秒'
     else:
-        return f'{int(duration / 86400)}天{int((duration % 86400) / 3600)}小时{int((duration % 3600) / 60)}分钟{duration % 60}秒'
+        return f'{seconds}秒'
 
 
 def escape_color(text: str) -> str:
