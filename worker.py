@@ -170,7 +170,8 @@ class VideoWorker(object):
         )
         live_not_started_error_tokens = (
             'Premieres in',
-            'This live event will begin in'
+            'This live event will begin in',
+            'Watch on the latest version of YouTube'
         )
 
         retry_reason = ''
