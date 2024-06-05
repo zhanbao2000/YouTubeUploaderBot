@@ -84,10 +84,11 @@ async def stat(_, message: Message):
                total size: {format_file_size(get_backup_videos_total_size())}
                total duration: {format_duration(get_backup_videos_total_duration())}
 
-             switch
+             settings
                notify on success: {worker.current_running_reply_on_success}
                notify on failure: {worker.current_running_reply_on_failure}
                scheduler status: {scheduler_manager.get_running_status()}
+               download max size: {worker.current_running_download_max_size} MB
 
              API calls
                google api calls (1m): {counter.count_last_minute()}
@@ -216,6 +217,20 @@ async def add_extra_subscription(_, message: Message):
         )
 
 
+@app.on_message(filters.command('set_download_max_size') & is_superuser)
+async def set_download_max_size(_, message: Message):
+    size = get_args(message)
+    if not size or not size.isdigit():
+        return
+
+    if int(size) < 100:
+        await message.reply_text('size must be greater than 100 MB', quote=True)
+        return
+
+    worker.current_running_download_max_size = int(size)
+    await message.reply_text(f'max size set to {worker.current_running_download_max_size} MB', quote=True)
+
+
 @app.on_message(filters.command('toggle_reply_on_success') & is_superuser)
 async def toggle_reply_on_success(_, message: Message):
     worker.current_running_reply_on_success = not worker.current_running_reply_on_success
@@ -283,6 +298,7 @@ if __name__ == '__main__':
         BotCommand(command='add_channel', description='all the videos uploaded by the channel'),
         BotCommand(command='add_subscription', description='add recent subscription feeds'),
         BotCommand(command='add_extra_subscription', description='add channel into separated subscription list'),
+        BotCommand(command='set_download_max_size', description='set max size of downloading video'),
         BotCommand(command='toggle_reply_on_success', description='change success notification setting'),
         BotCommand(command='toggle_reply_on_failure', description='change failure notification setting'),
         BotCommand(command='toggle_scheduler', description='change scheduler status'),

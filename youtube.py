@@ -144,22 +144,12 @@ class DownloadManager(object):
 
         return result
 
-    def download_max_size_2000mb(self) -> dict:
-        """download the largest video but no bigger than 2000 MB"""
+    def download_max_size(self, max_size_mb: int) -> dict:
+        """download the largest video but no bigger than given size"""
         ydl_options = self._get_base_ydl_options()
         ydl_options.update({
             'format': 'bv+ba/b',
-            'format_sort': ['size:2000M'],
-            'merge_output_format': 'mp4',
-        })
-
-        return self._download(ydl_options)
-
-    def download_max_size_1600mb(self) -> dict:
-        """download the largest video but no bigger than 1600 MB"""
-        ydl_options = self._get_base_ydl_options()
-        ydl_options.update({
-            'format_sort': ['size:1600M'],
+            'format_sort': [f'size:{max_size_mb or 1}M'],  # at least 1 MB
             'merge_output_format': 'mp4',
         })
 

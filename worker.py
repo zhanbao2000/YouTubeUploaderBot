@@ -39,6 +39,7 @@ class VideoWorker(object):
         self.current_running_transfer_files = 0  # total files transferred from startup
         self.current_running_transfer_size = 0  # total size transferred from startup
         self.current_running_retry_list: set[str] = set()  # save links with download error
+        self.current_running_download_max_size = 2000  # max size of video to download
         self.current_running_reply_on_success = True
         self.current_running_reply_on_failure = True
 
@@ -120,12 +121,14 @@ class VideoWorker(object):
     async def download_video(self, dm: DownloadManager) -> dict:
         """download the video, return the video info"""
         loop = self.app.loop or get_running_loop()
-        video_info = await loop.run_in_executor(None, dm.download_max_size_2000mb)
+        video_info = await loop.run_in_executor(None, dm.download_max_size, self.current_running_download_max_size)
 
+        # the 2 GB check here is just to prevent the file size exceeds the Telegram limit,
+        # it has nothing to do with the `current_running_download_max_size`
         if (filesize := dm.file.stat().st_size) >= 2e9:
             dm.file.unlink()
             await self.reply_failure(f'file too big: {format_file_size(filesize)}\ntry downloading smaller format')
-            video_info = await loop.run_in_executor(None, dm.download_max_size_1600mb)
+            video_info = await loop.run_in_executor(None, dm.download_max_size, 1600)  # 1600 MB is a proper size
             # if this format is still too big, the video_id will be recorded in db with message_id = 0
 
         return video_info
