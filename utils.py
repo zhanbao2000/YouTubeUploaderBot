@@ -57,6 +57,11 @@ def create_video_link(video_id: str) -> str:
     return f'https://www.youtube.com/watch?v={video_id}'
 
 
+def create_video_link_markdown(video_id: str, title: str = '') -> str:
+    """create a YouTube video link in Markdown format"""
+    return f'[{title or video_id}]({create_video_link(video_id)})'
+
+
 def convert_date(date: str) -> str:
     """convert date string to human-readable format"""
     return f'{date[:4]}年{date[4:6]}月{date[6:8]}日'

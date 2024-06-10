@@ -20,7 +20,7 @@ from database import (
 )
 from typedef import Task, RetryReason, VideoStatus, HashTag, IncompleteTranscodingError, VideoTooShortError
 from utils import (
-    format_file_size, create_message_link, escape_color, slide_window,
+    format_file_size, create_message_link, escape_color, slide_window, create_video_link_markdown,
     offset_text_link_entities, escape_hashtag_from_caption, create_video_link,
 )
 from youtube import (
@@ -106,8 +106,7 @@ class VideoWorker(object):
     async def reply_duplicate(self, video_id: str) -> None:
         """inform the user that this video had been uploaded"""
         if video_message_id := get_upload_message_id(video_id):  # video_message_id == 0
-            await self.reply_failure(f'this video had been [uploaded]({create_message_link(CHAT_ID, video_message_id)})',
-                                     parse_mode=ParseMode.MARKDOWN)
+            await self.reply_failure(f'this video had been [uploaded]({create_message_link(CHAT_ID, video_message_id)})')
         else:  # video_message_id != 0
             await self.reply_failure('this video used to be tried to upload, but failed')
 
@@ -159,7 +158,8 @@ class VideoWorker(object):
         duration = video_info['duration']
 
         insert_video(dm.video_id, 0, 0, video_info, VideoStatus.TOO_SHORT)
-        await self.reply_failure(f'error on downloading this video: {dm.video_id}\nToo short video, duration: {duration}\n')
+        await self.reply_failure(f'error on downloading this video: {create_video_link_markdown(dm.video_id)}\n'
+                                 f'Too short video, duration: {duration}\n')
 
     async def on_download_error(self, dm: DownloadManager, e: YoutubeDLError) -> None:
         """handle error of YoutubeDLError"""
@@ -188,9 +188,10 @@ class VideoWorker(object):
 
         if retry_reason:
             self.current_running_retry_list.add(dm.url)
-            await self.reply_failure(f'{retry_reason}: {dm.video_id}\n{msg}\nthis url has been saved to retry list, you can retry it later')
+            await self.reply_failure(f'{retry_reason}: {create_video_link_markdown(dm.video_id)}\n{msg}\n'
+                                     f'this url has been saved to retry list, you can retry it later')
         else:
-            await self.reply_failure(f'error on downloading this video: {dm.video_id}\n{msg}\n')
+            await self.reply_failure(f'error on downloading this video: {create_video_link_markdown(dm.video_id)}\n{msg}\n')
 
     async def on_finish(self, dm: DownloadManager, video_info: Optional[dict], thumbnail_message: Optional[Message]) -> None:
         """handle finish event"""
