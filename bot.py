@@ -49,10 +49,10 @@ async def check(_, message: Message):
 
 @app.on_message(filters.command('retry') & is_superuser)
 async def retry(_, message: Message):
-    count_urls = len(worker.current_running_retry_list)
+    count_urls = len(worker.session_retry_list)
 
-    count_urls_filtered = await worker.add_task_batch(worker.current_running_retry_list, message.chat.id, message.id)
-    worker.current_running_retry_list.clear()
+    count_urls_filtered = await worker.add_task_batch(worker.session_retry_list, message.chat.id, message.id)
+    worker.session_retry_list.clear()
 
     await message.reply_text(
         text=f'{count_urls} video(s) in current retry list\n'
@@ -70,12 +70,12 @@ async def stat(_, message: Message):
              statistics:
 
              transfer
-               transfer files: {worker.current_running_transfer_files}
-               transfer size: {format_file_size(worker.current_running_transfer_size)}
+               transfer files: {worker.session_transfer_files}
+               transfer size: {format_file_size(worker.session_transfer_size)}
 
              tasks
                pending tasks: {worker.get_pending_tasks_count()}
-               retry list size: {len(worker.current_running_retry_list)}
+               retry list size: {len(worker.session_retry_list)}
 
              video count
                backup videos count: {get_backup_videos_count()}
@@ -85,10 +85,10 @@ async def stat(_, message: Message):
                total duration: {format_duration(get_backup_videos_total_duration())}
 
              settings
-               notify on success: {worker.current_running_reply_on_success}
-               notify on failure: {worker.current_running_reply_on_failure}
+               notify on success: {worker.session_reply_on_success}
+               notify on failure: {worker.session_reply_on_failure}
                scheduler status: {scheduler_manager.get_running_status()}
-               download max size: {worker.current_running_download_max_size} MB
+               download max size: {worker.session_download_max_size} MB
 
              API calls
                google api calls (1m): {counter.count_last_minute()}
@@ -111,11 +111,11 @@ async def stat(_, message: Message):
 async def clear(_, message: Message):
     await message.reply_text(
         text=f'{worker.get_queue_size()} pending task(s) cancelled\n'
-             f'{len(worker.current_running_retry_list)} retry task(s) cancelled',
+             f'{len(worker.session_retry_list)} retry task(s) cancelled',
         quote=True
     )
     await worker.clear_queue()
-    worker.current_running_retry_list.clear()
+    worker.session_retry_list.clear()
 
 
 @app.on_message(filters.command('add_list') & is_superuser)
@@ -227,28 +227,28 @@ async def set_download_max_size(_, message: Message):
         await message.reply_text('size must be greater than 100 MB', quote=True)
         return
 
-    worker.current_running_download_max_size = int(size)
-    await message.reply_text(f'max size set to {worker.current_running_download_max_size} MB', quote=True)
+    worker.session_download_max_size = int(size)
+    await message.reply_text(f'max size set to {worker.session_download_max_size} MB', quote=True)
 
 
 @app.on_message(filters.command('toggle_reply_on_success') & is_superuser)
 async def toggle_reply_on_success(_, message: Message):
-    worker.current_running_reply_on_success = not worker.current_running_reply_on_success
+    worker.session_reply_on_success = not worker.session_reply_on_success
     await message.reply_text(
         text=f'current notification setting\n'
-             f'on success: {worker.current_running_reply_on_success}\n'
-             f'on failure: {worker.current_running_reply_on_failure}',
+             f'on success: {worker.session_reply_on_success}\n'
+             f'on failure: {worker.session_reply_on_failure}',
         quote=True
     )
 
 
 @app.on_message(filters.command('toggle_reply_on_failure') & is_superuser)
 async def toggle_reply_on_failure(_, message: Message):
-    worker.current_running_reply_on_failure = not worker.current_running_reply_on_failure
+    worker.session_reply_on_failure = not worker.session_reply_on_failure
     await message.reply_text(
         text=f'current notification setting\n'
-             f'on success: {worker.current_running_reply_on_success}\n'
-             f'on failure: {worker.current_running_reply_on_failure}',
+             f'on success: {worker.session_reply_on_success}\n'
+             f'on failure: {worker.session_reply_on_failure}',
         quote=True
     )
 

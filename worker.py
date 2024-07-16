@@ -36,12 +36,12 @@ class VideoWorker(object):
         self.app = app
         self.video_queue: Queue[Task] = Queue()
         self.current_task: Optional[Task] = None
-        self.current_running_transfer_files = 0  # total files transferred from startup
-        self.current_running_transfer_size = 0  # total size transferred from startup
-        self.current_running_retry_list: set[str] = set()  # save links with download error
-        self.current_running_download_max_size = 2000  # max size of video to download
-        self.current_running_reply_on_success = True
-        self.current_running_reply_on_failure = True
+        self.session_transfer_files = 0  # total files transferred from startup
+        self.session_transfer_size = 0  # total size transferred from startup
+        self.session_retry_list: set[str] = set()  # save links with download error
+        self.session_download_max_size = 2000  # max size of video to download
+        self.session_reply_on_success = True
+        self.session_reply_on_failure = True
 
     def get_pending_tasks_count(self) -> int:
         """return pending tasks = waiting + current"""
@@ -95,12 +95,12 @@ class VideoWorker(object):
 
     async def reply_success(self, text: str, **kwargs) -> Optional[Message]:
         """reply when the video is successfully uploaded"""
-        if self.current_running_reply_on_success:
+        if self.session_reply_on_success:
             return await self.reply(text, **kwargs)
 
     async def reply_failure(self, text: str, **kwargs) -> Optional[Message]:
         """reply when the video is failed to upload"""
-        if self.current_running_reply_on_failure:
+        if self.session_reply_on_failure:
             return await self.reply(text, **kwargs)
 
     async def reply_duplicate(self, video_id: str) -> None:
@@ -120,7 +120,7 @@ class VideoWorker(object):
     async def download_video(self, dm: DownloadManager) -> dict:
         """download the video, return the video info"""
         loop = self.app.loop or get_running_loop()
-        video_info = await loop.run_in_executor(None, dm.download_max_size, self.current_running_download_max_size)
+        video_info = await loop.run_in_executor(None, dm.download_max_size, self.session_download_max_size)
 
         # the 2 GB check here is just to prevent the file size exceeds the Telegram limit,
         # it has nothing to do with the `current_running_download_max_size`
@@ -145,8 +145,8 @@ class VideoWorker(object):
                 caption=get_video_caption(video_info), reply_to_message_id=video_message.id
             )
 
-            self.current_running_transfer_files += 1
-            self.current_running_transfer_size += file.stat().st_size
+            self.session_transfer_files += 1
+            self.session_transfer_size += file.stat().st_size
 
             return thumbnail_message
 
@@ -187,7 +187,7 @@ class VideoWorker(object):
             retry_reason = RetryReason.INCOMPLETE_TRANSCODING
 
         if retry_reason:
-            self.current_running_retry_list.add(dm.url)
+            self.session_retry_list.add(dm.url)
             await self.reply_failure(f'{retry_reason}: {create_video_link_markdown(dm.video_id)}\n{msg}\n'
                                      f'this url has been saved to retry list, you can retry it later')
         else:
@@ -385,5 +385,5 @@ class SchedulerManager(object):
 
     async def retry(self) -> None:
         """retry all videos in retry list"""
-        await self.worker.add_task_batch(self.worker.current_running_retry_list, None, None)
-        self.worker.current_running_retry_list.clear()
+        await self.worker.add_task_batch(self.worker.session_retry_list, None, None)
+        self.worker.session_retry_list.clear()
