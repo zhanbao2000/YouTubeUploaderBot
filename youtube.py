@@ -69,6 +69,10 @@ class DownloadManager(object):
     def _get_base_ydl_options(self) -> dict:
         """get base ydl options"""
         return {
+            # TODO The following three lines serve as a temporary solution to mitigate 403 error
+            'username': 'oauth2',
+            'password': '',
+            'player_client': 'ios',
             'proxy': PROXY,
             'ffmpeg_location': 'bin',
             'concurrent_fragment_downloads': 16,
