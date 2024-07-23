@@ -131,8 +131,8 @@ class DownloadManager(object):
                 result = VideoStatus.VIDEO_DELETED
             elif 'This video is no longer available because the YouTube account associated with this video has been terminated' in msg:
                 result = VideoStatus.ACCOUNT_TERMINATED
-            # elif '' in msg:
-            #     result = VideoStatus.ACCOUNT_CLOSED
+            elif 'This video is no longer available because the uploader has closed their YouTube account' in msg:
+                result = VideoStatus.ACCOUNT_CLOSED
             elif 'This video has been removed for violating YouTube\'s policy on nudity or sexual content' in msg:
                 result = VideoStatus.NUDITY_OR_SEXUAL_CONTENT
             elif 'Join this channel to get access to members-only content like this video, and other exclusive perks' in msg:
