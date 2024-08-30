@@ -139,3 +139,7 @@ database.dat
 
 # pyrogram generated
 *.session
+
+# cookies from https://github.com/hrdl-github/cookies-txt
+cookies.txt
+cookies.私人.txt
