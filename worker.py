@@ -16,12 +16,14 @@ from config import DOWNLOAD_ROOT, CHAT_ID, SUPERUSERS
 from database import (
     insert_video, is_in_database,
     get_upload_message_id, update_status, get_status, get_all_video_ids,
-    get_all_extra_subscription_channel_ids
+    get_all_extra_subscription_channel_ids,
+    get_backup_videos_total_duration, get_backup_videos_total_size
 )
 from typedef import Task, RetryReason, VideoStatus, HashTag, IncompleteTranscodingError, VideoTooShortError
 from utils import (
     format_file_size, create_message_link, escape_color, slide_window, create_video_link_markdown,
     offset_text_link_entities, escape_hashtag_from_caption, create_video_link,
+    find_channel_in_message, now_datetime, join_list, format_duration,
 )
 from youtube import (
     DownloadManager, get_video_caption, get_video_id, is_video_available_online_batch,
@@ -257,6 +259,8 @@ class VideoChecker(object):
         self.count_become_unavailable = 0
         self.count_all_available = 0
         self.count_all_unavailable = 0
+        self.count_all_unavailable_by_reasons: dict[VideoStatus, int] = dict.fromkeys((status for status in VideoStatus), 0)
+        self.terminated_or_closed_accounts: set[tuple[str, str]] = set()
 
     async def edit_video_caption(self, message_id: int, video_status: VideoStatus) -> None:
         message = await self.app.get_messages(CHAT_ID, message_id)
@@ -273,6 +277,50 @@ class VideoChecker(object):
             caption_entities=offset_text_link_entities(entities, len(edited_caption) - len(message.caption))
         )
 
+    def generate_check_report(self) -> str:
+        lines = join_list(
+            [''],
+            [f'#视频有效性检查报告 {now_datetime()}'],
+            self.generate_check_report_become_unavailable(),
+            self.generate_check_report_account_terminated_or_closed(),
+            self.generate_check_report_stats()
+        )
+        return '\n'.join(lines)
+
+    def generate_check_report_become_unavailable(self) -> list[str]:
+        lines = []
+
+        if self.count_become_unavailable:
+            lines.append(f'本次检查中，新增 {self.count_become_unavailable} 个视频已在源站不可观看，其中：')
+            for video_status, count in self.count_all_unavailable_by_reasons.items():
+                if count:
+                    tag = HashTag[video_status].removeprefix('#')
+                    lines.append(f'{tag}：{count} 个')
+
+        else:
+            lines.append('本次检查中，没有新增已在源站不可观看的视频。')
+
+        return lines
+
+    def generate_check_report_account_terminated_or_closed(self) -> list[str]:
+        lines = []
+
+        if self.terminated_or_closed_accounts:
+            lines.append('以下 YouTube 账号已终止或已关闭：')
+            for channel_name, channel_url in self.terminated_or_closed_accounts:
+                lines.append(f'[{channel_name}]({channel_url})')
+
+        return lines
+
+    def generate_check_report_stats(self) -> list[str]:
+        unavailable_percent = self.count_all_unavailable / self.count_all * 100
+        return [
+            f'已备份视频总数：{self.count_all} 个',
+            f'在源站不可观看：{self.count_all_unavailable} 个（{unavailable_percent:.2f}%）',
+            f'已备份视频总大小：{format_file_size(get_backup_videos_total_size())}',
+            f'已备份视频总时长：{format_duration(get_backup_videos_total_duration())}',
+        ]
+
     async def handle_become_available(self, video_id: str) -> None:
         await sleep(3)
         self.count_become_available += 1
@@ -286,6 +334,17 @@ class VideoChecker(object):
         update_status(video_id, video_status)
         await self.reply_change(video_id, f'detected new unavailable video\n{video_status.name}')
         await self.edit_video_caption(get_upload_message_id(video_id), video_status)
+        self.count_all_unavailable_by_reasons[video_status] += 1
+
+        if video_status in (VideoStatus.ACCOUNT_TERMINATED, VideoStatus.ACCOUNT_CLOSED):
+            await self.handle_account_terminated_or_closed(video_id)
+
+    async def handle_account_terminated_or_closed(self, video_id: str) -> None:
+        message_id = get_upload_message_id(video_id)
+        message = await self.app.get_messages(CHAT_ID, message_id)
+        channel_name, channel_url = find_channel_in_message(message)
+
+        self.terminated_or_closed_accounts.add((channel_name, channel_url))  # account is equivalent to channel
 
     async def reply_change(self, video_id: str, text: str) -> None:
         if not self.verbose:

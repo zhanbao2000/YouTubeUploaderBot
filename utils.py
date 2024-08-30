@@ -3,7 +3,7 @@ from datetime import datetime
 from os import getpid
 from platform import system
 from re import sub, search
-from time import time
+from time import time, localtime, strftime
 from typing import Optional, TypeVar, Generator
 
 from httpx import AsyncClient, AsyncHTTPTransport, Request
@@ -63,8 +63,14 @@ def create_video_link_markdown(video_id: str, title: str = '') -> str:
 
 
 def convert_date(date: str) -> str:
-    """convert date string to human-readable format"""
+    """convert date string to human-readable format, 20200220 -> 2020年02月20日"""
     return f'{date[:4]}年{date[4:6]}月{date[6:8]}日'
+
+
+def now_datetime() -> str:
+    """return current time and date, format: 2020-02-20 11:45:14"""
+    time_local = localtime(time())
+    return strftime('%Y-%m-%d %H:%M:%S', time_local)
 
 
 def format_file_size(byte: int) -> str:
@@ -144,6 +150,17 @@ def escape_hashtag_from_caption(caption: str) -> str:
     return caption
 
 
+def find_channel_in_message(message: Message) -> tuple[str, str]:
+    """find channel name and URL in a message, if not found, return 2 empty str"""
+    # do NOT use str.find() as some chars in message.caption may be emoji (UTF-16-LE) and the length is not 1
+    match = search(r'\n频道：(.*?)\n时长', message.caption)
+
+    for entity in message.caption_entities:
+        text = message.caption[entity.offset:entity.offset + entity.length]
+        if text == match.group(1) and entity.type is MessageEntityType.TEXT_LINK:
+            return text, entity.url
+
+
 def get_memory_usage():
     """get memory usage, using psutil library"""
     process = Process(getpid())
@@ -175,6 +192,17 @@ def parse_upload_timestamp(video_info: dict) -> datetime:
     elif video_info.get('upload_date') is not None:
         return datetime.strptime(video_info['upload_date'], '%Y%m%d')
     raise ValueError('No upload timestamp found in video_info')
+
+
+def join_list(separator: list[T], *lists: list[T]) -> Generator[T, None, None]:
+    """sep=[x, y], *lists=[a, b], [c], [d, e] -> [a, b, x, y, c, x, y, d, e]"""
+    length = len(lists)
+    for index, lst in enumerate(lists, start=1):
+        if not lst:  # skip empty list
+            continue
+        yield from lst
+        if index != length:  # do not add separator after the last list
+            yield from separator
 
 
 is_superuser = filters.chat(SUPERUSERS)
