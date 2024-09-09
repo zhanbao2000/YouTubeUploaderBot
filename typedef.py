@@ -85,6 +85,7 @@ class VideoStatus(int, Enum):
     ACCOUNT_CLOSED = -5
     NUDITY_OR_SEXUAL_CONTENT = -6
     MEMBERS_ONLY = -7
+    VIOLATE_TOS = -8
 
 
 HashTag = {
@@ -96,5 +97,6 @@ HashTag = {
     VideoStatus.ACCOUNT_TERMINATED: '#账号已终止',
     VideoStatus.ACCOUNT_CLOSED: '#账号已关闭',
     VideoStatus.NUDITY_OR_SEXUAL_CONTENT: '#裸露或色情内容',
-    VideoStatus.MEMBERS_ONLY: '#会员限定'
+    VideoStatus.MEMBERS_ONLY: '#会员限定',
+    VideoStatus.VIOLATE_TOS: '#违反服务条款'
 }

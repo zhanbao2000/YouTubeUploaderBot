@@ -133,6 +133,8 @@ class DownloadManager(object):
                 result = VideoStatus.ACCOUNT_CLOSED
             elif 'This video has been removed for violating YouTube\'s policy on nudity or sexual content' in msg:
                 result = VideoStatus.NUDITY_OR_SEXUAL_CONTENT
+            elif 'This video has been removed for violating YouTube\'s Terms of Service' in msg:
+                result = VideoStatus.VIOLATE_TOS
             elif 'Join this channel to get access to members-only content like this video, and other exclusive perks' in msg:
                 result = VideoStatus.MEMBERS_ONLY
             elif 'This video is unavailable' in msg:
