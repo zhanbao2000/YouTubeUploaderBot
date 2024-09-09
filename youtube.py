@@ -13,7 +13,7 @@ from model.playlistItems import PlaylistItems
 from model.subscriptions import Subscriptions
 from model.videos import Videos
 from typedef import VideoStatus, IncompleteTranscodingError, VideoTooShortError
-from utils import format_file_size, convert_date, get_client, create_video_link
+from utils import format_file_size, format_date, get_client, create_video_link
 
 
 class Format(object):
@@ -191,7 +191,7 @@ def get_video_caption(video_info: dict) -> str:
     duration_string = video_info['duration_string']
     uploader = video_info['uploader']
     uploader_url = video_info['uploader_url']
-    upload_date = convert_date(video_info['upload_date'])
+    upload_date = format_date(video_info['upload_date'])
     resolution = video_info['resolution']
     fps = video_info['fps']
     vcodec = video_info['vcodec'].split('.', 1)[0]
@@ -353,9 +353,7 @@ async def get_all_my_subscription_channel_ids() -> list[str]:
             resp = await client.get('https://www.googleapis.com/youtube/v3/subscriptions', params=params, headers=headers)
             subscriptions = Subscriptions(**resp.json())
 
-            items = subscriptions.items
-
-            for item in items:
+            for item in subscriptions.items:
                 channel_id = item.snippet.resourceId.channelId
                 result.append(channel_id)
 

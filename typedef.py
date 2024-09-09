@@ -14,6 +14,8 @@ class VideoTooShortError(RuntimeError):
 
 
 class UniqueQueue(Queue):
+    """A queue that ensures all items are unique (set-like). It supports the `in` operator to check for item existence."""
+
     def __init__(self, maxsize=0):
         super().__init__(maxsize)
         self._set = set()
@@ -38,7 +40,7 @@ class Task(object):
         self.chat_id = chat_id
         self.message_id = message_id
 
-    # override __hash__ and __eq__ so that set() or dict() only consider the url
+    # override __hash__() and __eq__() so that set() only considers url when deduplicating
 
     def __hash__(self):
         return hash(self.url)

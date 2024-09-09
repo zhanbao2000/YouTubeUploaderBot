@@ -23,7 +23,7 @@ class APIUsageCounter:
 
     def add_timestamp(self):
         self.timestamps.append(time())
-        # Perform cleanup every 1000 timestamps
+        # clean up timestamps every 1000 requests
         if len(self.timestamps) % 1000 == 0:
             self._cleanup()
 
@@ -62,15 +62,15 @@ def create_video_link_markdown(video_id: str, title: str = '') -> str:
     return f'[{title or video_id}]({create_video_link(video_id)})'
 
 
-def convert_date(date: str) -> str:
-    """convert date string to human-readable format, 20200220 -> 2020年02月20日"""
-    return f'{date[:4]}年{date[4:6]}月{date[6:8]}日'
-
-
 def now_datetime() -> str:
     """return current time and date, format: 2020-02-20 11:45:14"""
     time_local = localtime(time())
     return strftime('%Y-%m-%d %H:%M:%S', time_local)
+
+
+def format_date(date: str) -> str:
+    """convert date string to human-readable format, 20200220 -> 2020年02月20日"""
+    return f'{date[:4]}年{date[4:6]}月{date[6:8]}日'
 
 
 def format_file_size(byte: int) -> str:
@@ -101,8 +101,8 @@ def format_duration(duration: int) -> str:
         return f'{seconds}秒'
 
 
-def escape_color(text: str) -> str:
-    """escape color codes"""
+def remove_color_codes(text: str) -> str:
+    """remove color codes"""
     return sub(r'\x1b\[[0-9;]*m', '', text)
 
 
@@ -113,6 +113,7 @@ def slide_window(lst: list[T], window_size: int) -> Generator[list[T], None, Non
 
 
 async def on_googleapi_call(request: Request):
+    """hook function that records the timestamp of a Google API call"""
     if request.url.host.endswith('googleapis.com'):
         counter.add_timestamp()
 
@@ -142,8 +143,8 @@ def offset_text_link_entities(entities: list[MessageEntity], offset: int) -> lis
     return entities
 
 
-def escape_hashtag_from_caption(caption: str) -> str:
-    """delete hashtags from caption"""
+def remove_hashtags_from_caption(caption: str) -> str:
+    """remove hashtags from caption"""
     title_index = caption.find('标题')
     if title_index != -1:
         return caption[title_index:]
@@ -151,8 +152,8 @@ def escape_hashtag_from_caption(caption: str) -> str:
 
 
 def find_channel_in_message(message: Message) -> tuple[str, str]:
-    """find channel name and URL in a message, if not found, return 2 empty str"""
-    # do NOT use str.find() as some chars in message.caption may be emoji (UTF-16-LE) and the length is not 1
+    """find channel name and URL in a message"""
+    # do NOT use str.find() because some of the characters in message.caption may be emojis (UTF-16-LE), which have a length more than 1
     match = search(r'\n频道：(.*?)\n时长', message.caption)
 
     for entity in message.caption_entities:
@@ -161,9 +162,9 @@ def find_channel_in_message(message: Message) -> tuple[str, str]:
             return text, entity.url
 
 
-def get_next_retry_ts(msg: str) -> float:
+def get_next_retry_ts(error_message: str) -> float:
     """get next retry timestamp from error message"""
-    match = search(r'in (\d+) (minute|hour|day)', msg)
+    match = search(r'in (\d+) (minute|hour|day)', error_message)
 
     if match:
         amount, unit = match.groups()
@@ -173,7 +174,7 @@ def get_next_retry_ts(msg: str) -> float:
             return time() + int(amount) * 60 * 60
         elif unit == 'day':
             return time() + int(amount) * 24 * 60 * 60
-    elif 'in a few moments' in msg:
+    elif 'in a few moments' in error_message:
         return time() + 24 * 60 * 60
 
     return time()
@@ -218,7 +219,13 @@ def parse_upload_timestamp(video_info: dict) -> datetime:
 
 
 def join_list(separator: list[T], *lists: list[T]) -> Generator[T, None, None]:
-    """sep=[x, y], *lists=[a, b], [c], [d, e] -> [a, b, x, y, c, x, y, d, e]"""
+    """
+    join multiple lists with a separator
+
+    Example:
+      sep=[x, y], *lists=[a, b], [c], [d, e]
+      => [a, b, x, y, c, x, y, d, e]
+    """
     length = len(lists)
     for index, lst in enumerate(lists, start=1):
         if not lst:  # skip empty list

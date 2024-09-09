@@ -6,7 +6,6 @@ from config import DATABASE_FILE
 
 
 class Connect:
-
     def __init__(self, file_path):
         self.file_path = file_path
 
@@ -24,14 +23,14 @@ class Connect:
 
 
 def is_in_database(video_id: str) -> bool:
-    """check if a video is in the database"""
+    """check if video_id exists in the database"""
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT video_id FROM video WHERE video_id = ?', (video_id,))
         return c.fetchone() is not None
 
 
 def insert_video(video_id: str, message_id: int, size: int, video_info: dict, status: VideoStatus) -> None:
-    """insert a video into database, and record the message_id of the video message"""
+    """insert a video_id into the database and record its message_id when the video is uploaded"""
     with Connect(DATABASE_FILE) as c:
         title = video_info['title']
         duration = video_info['duration']
@@ -66,21 +65,21 @@ def get_status(video_id: str) -> VideoStatus:
 
 
 def get_all_video_ids() -> list[str]:
-    """get all video ids as a list, only for videos that have linked messages"""
+    """get all uploaded video ids as a list, only for videos that have linked messages"""
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT video_id FROM video WHERE message_id != 0')
         return [video_id for video_id, in c.fetchall()]
 
 
 def get_all_extra_subscription_channel_ids() -> list[str]:
-    """get all extra subscription channel ids"""
+    """get all extra subscription channel ids as a list"""
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT channel_id FROM extra_subscription')
         return [channel_id for channel_id, in c.fetchall()]
 
 
 def get_upload_message_id(video_id: str) -> int:
-    """get the message_id of the message of the video"""
+    """get the message_id of the thumbnail message of the video"""
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT message_id FROM video WHERE video_id = ?', (video_id,))
         result = c.fetchone()
@@ -116,14 +115,14 @@ def get_video_count_by_status(status: VideoStatus) -> int:
 
 
 def get_backup_videos_total_size() -> int:
-    """get the total size of videos in the database"""
+    """get the total file size of the backed up videos in the database"""
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT SUM(size) FROM video')
         return c.fetchone()[0] or 0
 
 
 def get_backup_videos_total_duration() -> int:
-    """get the total duration of videos in the database"""
+    """get the total duration of the backed up videos in the database"""
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT SUM(duration) FROM video')
         return c.fetchone()[0] or 0

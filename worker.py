@@ -21,8 +21,8 @@ from database import (
 )
 from typedef import Task, RetryReason, VideoStatus, HashTag, IncompleteTranscodingError, VideoTooShortError, UniqueQueue, AddResult
 from utils import (
-    format_file_size, create_message_link, escape_color, slide_window, create_video_link_markdown,
-    offset_text_link_entities, escape_hashtag_from_caption, create_video_link,
+    format_file_size, create_message_link, remove_color_codes, slide_window, create_video_link_markdown,
+    offset_text_link_entities, remove_hashtags_from_caption, create_video_link,
     find_channel_in_message, now_datetime, join_list, format_duration, get_next_retry_ts, is_ready
 )
 from youtube import (
@@ -36,12 +36,14 @@ class VideoWorker(object):
     def __init__(self, app: Client):
         self.is_working = False
         self.app = app
+
         self.video_queue: UniqueQueue[Task] = UniqueQueue()
         self.current_task: Optional[Task] = None
-        self.retry_tasks: dict[str, float] = dict()  # save urls with download error or live not started, {url: next_retry_ts}
-        self.session_transfer_files = 0  # total files transferred from startup
-        self.session_transfer_size = 0  # total size transferred from startup
-        self.session_download_max_size = 2000  # max size of video to download
+        self.retry_tasks: dict[str, float] = dict()  # save the urls of the task that need to be retried and the timestamps of their next retries
+
+        self.session_uploaded_files = 0  # total number of files that have been uploaded since startup
+        self.session_uploaded_size = 0  # total size of files that have been uploaded since startup
+        self.session_download_max_size = 2000  # max size of single format allowed when extracting video info (MB)
         self.session_reply_on_success = True
         self.session_reply_on_failure = True
 
@@ -54,7 +56,7 @@ class VideoWorker(object):
         return self.video_queue.qsize()
 
     async def add_task(self, url: str, chat_id: Optional[int], message_id: Optional[int]) -> AddResult:
-        """add a new task"""
+        """add a new task, skip if the task already exists in any of the queues or the database to avoid duplication"""
         video_id = get_video_id(url)
 
         if is_in_database(video_id):
@@ -85,7 +87,7 @@ class VideoWorker(object):
         return AddResult.SUCCESS
 
     async def add_task_batch(self, urls: Iterable[str], chat_id: Optional[int], message_id: Optional[int]) -> int:
-        """add many new tasks"""
+        """add tasks in batch, every task will be added individually"""
         count_task_added = 0
 
         for url in urls:
@@ -95,7 +97,7 @@ class VideoWorker(object):
         return count_task_added
 
     async def add_task_retry(self, chat_id: Optional[int], message_id: Optional[int]) -> int:
-        """retry all videos in retry list"""
+        """retry all ready tasks in retry_tasks."""
         count_task_added = 0
 
         for url, next_retry_ts in self.retry_tasks.copy().items():  # use copy() to avoid 'RuntimeError: dictionary changed size during iteration'
@@ -132,12 +134,12 @@ class VideoWorker(object):
                 continue
 
     async def reply_success(self, text: str, **kwargs) -> Optional[Message]:
-        """reply when the video is successfully uploaded"""
+        """reply when the video is successfully downloaded and uploaded"""
         if self.session_reply_on_success:
             return await self.reply(text, **kwargs)
 
     async def reply_failure(self, text: str, **kwargs) -> Optional[Message]:
-        """reply when the video is failed to upload"""
+        """reply when the video is failed to download or upload"""
         if self.session_reply_on_failure:
             return await self.reply(text, **kwargs)
 
@@ -158,7 +160,7 @@ class VideoWorker(object):
         if (filesize := dm.file.stat().st_size) >= 2e9:
             dm.file.unlink()
             await self.reply_failure(f'file too big: {format_file_size(filesize)}\ntry downloading smaller format')
-            video_info = await loop.run_in_executor(None, dm.download_max_size, 1600)  # 1600 MB is a proper size
+            video_info = await loop.run_in_executor(None, dm.download_max_size, 1600)  # retry with smaller format
             # if this format is still too big, the video_id will be recorded in db with message_id = 0
 
         return video_info
@@ -176,15 +178,15 @@ class VideoWorker(object):
                 caption=get_video_caption(video_info), reply_to_message_id=video_message.id
             )
 
-            self.session_transfer_files += 1
-            self.session_transfer_size += file.stat().st_size
+            self.session_uploaded_files += 1
+            self.session_uploaded_size += file.stat().st_size
 
             return thumbnail_message
 
     async def on_too_short_video(self, dm: DownloadManager) -> None:
         """handle error of VideoTooShortError"""
         loop = self.app.loop or get_running_loop()
-        # re-get video_info because video_info is None
+        # get video_info because video_info is None
         video_info = await loop.run_in_executor(None, dm.get_video_info)
         duration = video_info['duration']
 
@@ -194,7 +196,7 @@ class VideoWorker(object):
 
     async def on_download_error(self, dm: DownloadManager, e: YoutubeDLError) -> None:
         """handle error of YoutubeDLError"""
-        msg = escape_color(e.msg)
+        msg = remove_color_codes(e.msg)
         network_error_tokens = (
             'The read operation timed out',
             'Connection reset by peer',
@@ -246,7 +248,7 @@ class VideoWorker(object):
             dm = DownloadManager(self.current_task.url)
 
             self.is_working = True
-            # determine whether the download or upload is successful by setting its initial value to None
+            # determine whether the download or upload is successful by setting its initial value to None,
             # in finally block, if the value is still None, it means the download or upload is failed
             video_info: Optional[dict] = None  # for download
             thumbnail_message: Optional[Message] = None  # for upload
@@ -288,10 +290,10 @@ class VideoChecker(object):
         self.count_all_unavailable_by_reasons: dict[VideoStatus, int] = dict.fromkeys((status for status in VideoStatus), 0)
         self.terminated_or_closed_accounts: set[tuple[str, str]] = set()
 
-    async def edit_video_caption(self, message_id: int, video_status: VideoStatus) -> None:
+    async def update_video_caption(self, message_id: int, video_status: VideoStatus) -> None:
         message = await self.app.get_messages(CHAT_ID, message_id)
         entities = message.caption_entities
-        edited_caption = f'{HashTag[video_status]}\n{escape_hashtag_from_caption(message.caption)}'
+        edited_caption = f'{HashTag[video_status]}\n{remove_hashtags_from_caption(message.caption)}'
 
         if edited_caption == message.caption:
             return
@@ -352,14 +354,14 @@ class VideoChecker(object):
         self.count_become_available += 1
         update_status(video_id, VideoStatus.AVAILABLE)
         await self.reply_change(video_id, 'detected a video is available again')
-        await self.edit_video_caption(get_upload_message_id(video_id), VideoStatus.AVAILABLE)
+        await self.update_video_caption(get_upload_message_id(video_id), VideoStatus.AVAILABLE)
 
     async def handle_become_not_available(self, video_id: str, video_status: VideoStatus) -> None:
         await sleep(3)
         self.count_become_unavailable += 1
         update_status(video_id, video_status)
         await self.reply_change(video_id, f'detected new unavailable video\n{video_status.name}')
-        await self.edit_video_caption(get_upload_message_id(video_id), video_status)
+        await self.update_video_caption(get_upload_message_id(video_id), video_status)
         self.count_all_unavailable_by_reasons[video_status] += 1
 
         if video_status in (VideoStatus.ACCOUNT_TERMINATED, VideoStatus.ACCOUNT_CLOSED):
@@ -410,7 +412,6 @@ class VideoChecker(object):
 
 
 class SchedulerManager(object):
-
     def __init__(self, worker: VideoWorker, app: Client):
         self.worker = worker
         self.app = app

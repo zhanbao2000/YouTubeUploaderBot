@@ -68,11 +68,11 @@ async def stat(_, message: Message):
         text=dedent(f'''\
              statistics:
 
-             transfer
-               transfer files: {worker.session_transfer_files}
-               transfer size: {format_file_size(worker.session_transfer_size)}
+             session upload
+               uploaded files: {worker.session_uploaded_files}
+               uploaded size: {format_file_size(worker.session_uploaded_size)}
 
-             tasks
+             session tasks
                pending tasks: {worker.get_pending_tasks_count()}
                retry list size: {len(worker.retry_tasks)}
                retry ready: {sum(is_ready(next_retry_ts) for next_retry_ts in worker.retry_tasks.values())}
