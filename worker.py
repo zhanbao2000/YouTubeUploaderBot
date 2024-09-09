@@ -249,7 +249,8 @@ class VideoWorker(object):
                 await self.on_download_error(dm, e)
 
             except Exception:  # noqa
-                await self.reply_failure(f'error on uploading this video: {dm.video_id}\n{format_exc().splitlines()[-1]}')
+                await self.reply_failure(f'error on uploading this video: {create_video_link_markdown(dm.video_id)}\n'
+                                         f'{format_exc().splitlines()[-1]}')
 
             else:
                 await self.reply_task_done()
