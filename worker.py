@@ -23,7 +23,7 @@ from typedef import Task, RetryReason, VideoStatus, HashTag, IncompleteTranscodi
 from utils import (
     format_file_size, create_message_link, escape_color, slide_window, create_video_link_markdown,
     offset_text_link_entities, escape_hashtag_from_caption, create_video_link,
-    find_channel_in_message, now_datetime, join_list, format_duration,
+    find_channel_in_message, now_datetime, join_list, format_duration, get_next_retry_ts, is_ready
 )
 from youtube import (
     DownloadManager, get_video_caption, get_video_id, is_video_available_online_batch,
@@ -40,7 +40,7 @@ class VideoWorker(object):
         self.current_task: Optional[Task] = None
         self.session_transfer_files = 0  # total files transferred from startup
         self.session_transfer_size = 0  # total size transferred from startup
-        self.session_retry_list: set[str] = set()  # save links with download error
+        self.session_retry_tasks: dict[str, float] = {}  # save urls with download error or live not started, {url: next_retry_ts}
         self.session_download_max_size = 2000  # max size of video to download
         self.session_reply_on_success = True
         self.session_reply_on_failure = True
@@ -60,15 +60,27 @@ class VideoWorker(object):
     async def add_task_batch(self, urls: Iterable[str], chat_id: Optional[int], message_id: Optional[int]) -> int:
         """add many new tasks"""
         count_task_added = 0
+
         for url in urls:
 
-            if is_in_database(get_video_id(url)):
+            if is_in_database(get_video_id(url)):  # uploaded videos => skip
                 continue
+
+            if url in self.session_retry_tasks:
+                if is_ready(self.session_retry_tasks[url]):  # retry time expired => add, and remove from retry list
+                    self.session_retry_tasks.pop(url)
+                else:  # retry time not expired => skip
+                    continue
 
             await self.video_queue.put(Task(url, chat_id, message_id))
             count_task_added += 1
 
         return count_task_added
+
+    async def add_task_retry(self, chat_id: Optional[int], message_id: Optional[int]) -> int:
+        """retry all videos in retry list"""
+        retry_tasks = list(self.session_retry_tasks.keys())
+        return await self.add_task_batch(retry_tasks, chat_id, message_id)
 
     async def reply(self, text: str, **kwargs) -> Optional[Message]:
         """reply to the message which triggered current task"""
@@ -189,7 +201,7 @@ class VideoWorker(object):
             retry_reason = RetryReason.INCOMPLETE_TRANSCODING
 
         if retry_reason:
-            self.session_retry_list.add(dm.url)
+            self.session_retry_tasks[dm.video_id] = get_next_retry_ts(msg)
             await self.reply_failure(f'{retry_reason}: {create_video_link_markdown(dm.video_id)}\n{msg}\n'
                                      f'this url has been saved to retry list, you can retry it later')
         else:
@@ -444,5 +456,4 @@ class SchedulerManager(object):
 
     async def retry(self) -> None:
         """retry all videos in retry list"""
-        await self.worker.add_task_batch(self.worker.session_retry_list, None, None)
-        self.worker.session_retry_list.clear()
+        await self.worker.add_task_retry(None, None)

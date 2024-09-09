@@ -161,6 +161,29 @@ def find_channel_in_message(message: Message) -> tuple[str, str]:
             return text, entity.url
 
 
+def get_next_retry_ts(msg: str) -> float:
+    """get next retry timestamp from error message"""
+    match = search(r'in (\d+) (minute|hour|day)', msg)
+
+    if match:
+        amount, unit = match.groups()
+        if unit == 'minute':
+            return time() + int(amount) * 60
+        elif unit == 'hour':
+            return time() + int(amount) * 60 * 60
+        elif unit == 'day':
+            return time() + int(amount) * 24 * 60 * 60
+    elif 'in a few moments' in msg:
+        return time() + 24 * 60 * 60
+
+    return time()
+
+
+def is_ready(timestamp: float) -> bool:
+    """check if the task is ready to retry"""
+    return timestamp <= time()
+
+
 def get_memory_usage():
     """get memory usage, using psutil library"""
     process = Process(getpid())

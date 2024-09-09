@@ -13,7 +13,7 @@ from database import (
 from typedef import Task
 from utils import (
     format_file_size, format_duration, create_message_link, slide_window, is_superuser, get_args, counter,
-    get_memory_usage, get_swap_usage
+    get_memory_usage, get_swap_usage, is_ready
 )
 from worker import VideoWorker, VideoChecker, SchedulerManager
 from youtube import (
@@ -50,10 +50,8 @@ async def check(_, message: Message):
 
 @app.on_message(filters.command('retry') & is_superuser)
 async def retry(_, message: Message):
-    count_urls = len(worker.session_retry_list)
-
-    count_urls_filtered = await worker.add_task_batch(worker.session_retry_list, message.chat.id, message.id)
-    worker.session_retry_list.clear()
+    count_urls = len(worker.session_retry_tasks)
+    count_urls_filtered = await worker.add_task_retry(message.chat.id, message.id)
 
     await message.reply_text(
         text=f'{count_urls} video(s) in current retry list\n'
@@ -76,7 +74,8 @@ async def stat(_, message: Message):
 
              tasks
                pending tasks: {worker.get_pending_tasks_count()}
-               retry list size: {len(worker.session_retry_list)}
+               retry list size: {len(worker.session_retry_tasks)}
+               retry ready: {sum(is_ready(next_retry_ts) for next_retry_ts in worker.session_retry_tasks.values())}
 
              video count
                backup videos count: {get_backup_videos_count()}
@@ -112,11 +111,11 @@ async def stat(_, message: Message):
 async def clear(_, message: Message):
     await message.reply_text(
         text=f'{worker.get_queue_size()} pending task(s) cancelled\n'
-             f'{len(worker.session_retry_list)} retry task(s) cancelled',
+             f'{len(worker.session_retry_tasks)} retry task(s) cancelled',
         quote=True
     )
     await worker.clear_queue()
-    worker.session_retry_list.clear()
+    worker.session_retry_tasks.clear()
 
 
 @app.on_message(filters.command('add_list') & is_superuser)
