@@ -6,11 +6,11 @@ from pyrogram.types import BotCommand, Message
 
 from config import API_ID, API_HASH, BOT_TOKEN, DOWNLOAD_ROOT, CHAT_ID
 from database import (
-    is_in_database, get_upload_message_id, insert_extra_subscription,
+    get_upload_message_id, insert_extra_subscription,
     get_backup_videos_count, get_unavailable_videos_count, get_extra_subscriptions_count,
     get_all_extra_subscription_channel_ids, get_backup_videos_total_size, get_backup_videos_total_duration,
 )
-from typedef import Task
+from typedef import AddResult
 from utils import (
     format_file_size, format_duration, create_message_link, slide_window, is_superuser, get_args, counter,
     get_memory_usage, get_swap_usage, is_ready
@@ -50,7 +50,7 @@ async def check(_, message: Message):
 
 @app.on_message(filters.command('retry') & is_superuser)
 async def retry(_, message: Message):
-    count_urls = len(worker.session_retry_tasks)
+    count_urls = len(worker.retry_tasks)
     count_urls_filtered = await worker.add_task_retry(message.chat.id, message.id)
 
     await message.reply_text(
@@ -74,8 +74,8 @@ async def stat(_, message: Message):
 
              tasks
                pending tasks: {worker.get_pending_tasks_count()}
-               retry list size: {len(worker.session_retry_tasks)}
-               retry ready: {sum(is_ready(next_retry_ts) for next_retry_ts in worker.session_retry_tasks.values())}
+               retry list size: {len(worker.retry_tasks)}
+               retry ready: {sum(is_ready(next_retry_ts) for next_retry_ts in worker.retry_tasks.values())}
 
              video count
                backup videos count: {get_backup_videos_count()}
@@ -111,11 +111,11 @@ async def stat(_, message: Message):
 async def clear(_, message: Message):
     await message.reply_text(
         text=f'{worker.get_queue_size()} pending task(s) cancelled\n'
-             f'{len(worker.session_retry_tasks)} retry task(s) cancelled',
+             f'{len(worker.retry_tasks)} retry task(s) cancelled',
         quote=True
     )
     await worker.clear_queue()
-    worker.session_retry_tasks.clear()
+    worker.retry_tasks.clear()
 
 
 @app.on_message(filters.command('add_list') & is_superuser)
@@ -266,23 +266,25 @@ async def toggle_scheduler(_, message: Message):
 @app.on_message(filters.regex(r'(?:youtube\.com/(?:watch\?v=|live/)|youtu\.be/)([0-9A-Za-z_-]{11})') & is_superuser)
 async def youtube_url_regex(_, message: Message):
     url = str(message.text)
-    video_id = get_video_id(url)
+    add_result = await worker.add_task(url, message.chat.id, message.id)
 
-    if is_in_database(video_id):
+    if add_result is AddResult.SUCCESS:
+        reply = f'task added\ntotal task(s): {worker.get_pending_tasks_count()}'
+    elif add_result is AddResult.DUPLICATE_DATABASE_UPLOADED:
+        video_message_id = get_upload_message_id(get_video_id(url))
+        reply = f'this video has been uploaded\n{create_message_link(CHAT_ID, video_message_id)}'
+    elif add_result is AddResult.DUPLICATE_DATABASE_FAILED:
+        reply = 'this video has been uploaded but failed'
+    elif add_result is AddResult.DUPLICATE_QUEUE:
+        reply = 'this video is already in the queue'
+    elif add_result is AddResult.DUPLICATE_RETRY:
+        reply = 'this video is already in the retry list, but not ready to retry'
+    elif add_result is AddResult.DUPLICATE_CURRENT:
+        reply = 'this video is currently being processed'
+    else:
+        reply = f'unknown add result {add_result}'
 
-        if video_message_id := get_upload_message_id(video_id):  # video_message_id != 0
-            await message.reply_text(
-                text=f'this video had been [uploaded]({create_message_link(CHAT_ID, video_message_id)})',
-                quote=True
-            )
-        else:  # video_message_id == 0
-            await message.reply_text('this video used to be tried to upload, but failed', quote=True)
-
-        return
-
-    await worker.add_task(Task(url, message.chat.id, message.id))
-    await message.reply_text(f'task added\ntotal task(s): {worker.get_pending_tasks_count()}', quote=True)
-
+    await message.reply_text(reply, quote=True)
 
 if __name__ == '__main__':
     app.start()

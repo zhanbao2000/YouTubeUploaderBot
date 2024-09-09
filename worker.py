@@ -1,4 +1,4 @@
-from asyncio import Queue, QueueEmpty, get_running_loop, sleep
+from asyncio import QueueEmpty, get_running_loop, sleep
 from pathlib import Path
 from traceback import format_exc
 from typing import Iterable, Optional
@@ -19,7 +19,7 @@ from database import (
     get_all_extra_subscription_channel_ids,
     get_backup_videos_total_duration, get_backup_videos_total_size
 )
-from typedef import Task, RetryReason, VideoStatus, HashTag, IncompleteTranscodingError, VideoTooShortError
+from typedef import Task, RetryReason, VideoStatus, HashTag, IncompleteTranscodingError, VideoTooShortError, UniqueQueue, AddResult
 from utils import (
     format_file_size, create_message_link, escape_color, slide_window, create_video_link_markdown,
     offset_text_link_entities, escape_hashtag_from_caption, create_video_link,
@@ -36,11 +36,11 @@ class VideoWorker(object):
     def __init__(self, app: Client):
         self.is_working = False
         self.app = app
-        self.video_queue: Queue[Task] = Queue()
+        self.video_queue: UniqueQueue[Task] = UniqueQueue()
         self.current_task: Optional[Task] = None
+        self.retry_tasks: dict[str, float] = dict()  # save urls with download error or live not started, {url: next_retry_ts}
         self.session_transfer_files = 0  # total files transferred from startup
         self.session_transfer_size = 0  # total size transferred from startup
-        self.session_retry_tasks: dict[str, float] = {}  # save urls with download error or live not started, {url: next_retry_ts}
         self.session_download_max_size = 2000  # max size of video to download
         self.session_reply_on_success = True
         self.session_reply_on_failure = True
@@ -53,34 +53,58 @@ class VideoWorker(object):
         """return waiting tasks = queue size"""
         return self.video_queue.qsize()
 
-    async def add_task(self, task: Task) -> None:
+    async def add_task(self, url: str, chat_id: Optional[int], message_id: Optional[int]) -> AddResult:
         """add a new task"""
-        await self.video_queue.put(task)
+        video_id = get_video_id(url)
+
+        if is_in_database(video_id):
+            # There is no need to get the video_message_id every time when the video_id already exists in the database.
+            # since getting the video_message_id is only for the reply message of the bot, and get_upload_message_id() is slow.
+            # So get_upload_message_id() should be skipped when either chat_id or message_id is None.
+            if not chat_id or not message_id:
+                return AddResult.DUPLICATE_DATABASE
+            video_message_id = get_upload_message_id(video_id)
+            if video_message_id != 0:
+                return AddResult.DUPLICATE_DATABASE_UPLOADED
+            else:
+                return AddResult.DUPLICATE_DATABASE_FAILED
+
+        if self.is_working and url == self.current_task.url:
+            return AddResult.DUPLICATE_CURRENT
+
+        if url in self.video_queue:
+            return AddResult.DUPLICATE_QUEUE
+
+        if url in self.retry_tasks:
+            if is_ready(self.retry_tasks[url]):
+                self.retry_tasks.pop(url)
+            else:
+                return AddResult.DUPLICATE_RETRY
+
+        await self.video_queue.put(Task(url, chat_id, message_id))
+        return AddResult.SUCCESS
 
     async def add_task_batch(self, urls: Iterable[str], chat_id: Optional[int], message_id: Optional[int]) -> int:
         """add many new tasks"""
         count_task_added = 0
 
         for url in urls:
-
-            if is_in_database(get_video_id(url)):  # uploaded videos => skip
-                continue
-
-            if url in self.session_retry_tasks:
-                if is_ready(self.session_retry_tasks[url]):  # retry time expired => add, and remove from retry list
-                    self.session_retry_tasks.pop(url)
-                else:  # retry time not expired => skip
-                    continue
-
-            await self.video_queue.put(Task(url, chat_id, message_id))
-            count_task_added += 1
+            if await self.add_task(url, chat_id, message_id) == AddResult.SUCCESS:
+                count_task_added += 1
 
         return count_task_added
 
     async def add_task_retry(self, chat_id: Optional[int], message_id: Optional[int]) -> int:
         """retry all videos in retry list"""
-        retry_tasks = list(self.session_retry_tasks.keys())
-        return await self.add_task_batch(retry_tasks, chat_id, message_id)
+        count_task_added = 0
+
+        for url, next_retry_ts in self.retry_tasks.copy().items():  # use copy() to avoid 'RuntimeError: dictionary changed size during iteration'
+            if is_ready(next_retry_ts):
+                self.retry_tasks.pop(url)  # use pop() before add_task() since add_task() will check if url in self.retry_tasks
+                await self.add_task(url, chat_id, message_id)
+                count_task_added += 1
+
+        return count_task_added
 
     async def reply(self, text: str, **kwargs) -> Optional[Message]:
         """reply to the message which triggered current task"""
@@ -116,13 +140,6 @@ class VideoWorker(object):
         """reply when the video is failed to upload"""
         if self.session_reply_on_failure:
             return await self.reply(text, **kwargs)
-
-    async def reply_duplicate(self, video_id: str) -> None:
-        """inform the user that this video had been uploaded"""
-        if video_message_id := get_upload_message_id(video_id):  # video_message_id == 0
-            await self.reply_failure(f'this video had been [uploaded]({create_message_link(CHAT_ID, video_message_id)})')
-        else:  # video_message_id != 0
-            await self.reply_failure('this video used to be tried to upload, but failed')
 
     async def reply_task_done(self) -> None:
         """inform the user that this task had been done"""
@@ -201,7 +218,7 @@ class VideoWorker(object):
             retry_reason = RetryReason.INCOMPLETE_TRANSCODING
 
         if retry_reason:
-            self.session_retry_tasks[dm.video_id] = get_next_retry_ts(msg)
+            self.retry_tasks[dm.video_id] = get_next_retry_ts(msg)
             await self.reply_failure(f'{retry_reason}: {create_video_link_markdown(dm.video_id)}\n{msg}\n'
                                      f'this url has been saved to retry list, you can retry it later')
         else:
@@ -227,10 +244,6 @@ class VideoWorker(object):
         while True:
             self.current_task = await self.video_queue.get()
             dm = DownloadManager(self.current_task.url)
-
-            if is_in_database(dm.video_id):
-                await self.reply_duplicate(dm.video_id)
-                continue
 
             self.is_working = True
             # determine whether the download or upload is successful by setting its initial value to None
