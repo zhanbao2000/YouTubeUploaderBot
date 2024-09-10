@@ -220,7 +220,7 @@ class VideoWorker(object):
             retry_reason = RetryReason.INCOMPLETE_TRANSCODING
 
         if retry_reason:
-            self.retry_tasks[dm.video_id] = get_next_retry_ts(msg)
+            self.retry_tasks[dm.url] = get_next_retry_ts(msg)
             await self.reply_failure(f'{retry_reason}: {create_video_link_markdown(dm.video_id)}\n{msg}\n'
                                      f'this url has been saved to retry list, you can retry it later')
         else:
