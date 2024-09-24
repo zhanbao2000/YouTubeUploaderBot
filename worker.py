@@ -1,4 +1,5 @@
 from asyncio import QueueEmpty, get_running_loop, sleep
+from collections import defaultdict
 from pathlib import Path
 from traceback import format_exc
 from typing import Iterable, Optional
@@ -291,6 +292,7 @@ class VideoChecker(object):
         self.count_all_available = 0
         self.count_all_unavailable = 0
         self.count_all_unavailable_by_reasons: dict[VideoStatus, int] = dict.fromkeys((status for status in VideoStatus), 0)
+        self.count_all_unavailable_by_channel: defaultdict[tuple[str, str], int] = defaultdict(int)
         self.terminated_or_closed_accounts: set[tuple[str, str]] = set()
 
     async def update_video_caption(self, message_id: int, video_status: VideoStatus) -> None:
@@ -314,7 +316,8 @@ class VideoChecker(object):
             [f'#视频有效性检查报告 {now_datetime()}'],
             self.generate_check_report_become_unavailable(),
             self.generate_check_report_account_terminated_or_closed(),
-            self.generate_check_report_stats()
+            self.generate_check_report_stats(),
+            self.generate_check_report_many_unavailable()
         )
         return '\n'.join(lines)
 
@@ -343,6 +346,22 @@ class VideoChecker(object):
 
         return lines
 
+    def generate_check_report_many_unavailable(self) -> list[str]:
+        lines = []
+
+        # skip channels with less than 10 unavailable videos
+        for channel, count in self.count_all_unavailable_by_channel.copy().items():
+            if count < 10:
+                self.count_all_unavailable_by_channel.pop(channel)
+
+        if self.count_all_unavailable_by_channel:
+            lines.append('以下频道有较多视频在源站变得不可观看：')
+            channels_sorted_by_count = sorted(self.count_all_unavailable_by_channel.items(), key=lambda _: _[1], reverse=True)
+            for (channel_name, channel_url), count in channels_sorted_by_count:
+                lines.append(f'[{channel_name}]({channel_url})：{count} 个')
+
+        return lines
+
     def generate_check_report_stats(self) -> list[str]:
         unavailable_percent = self.count_all_unavailable / self.count_all * 100
         return [
@@ -356,6 +375,7 @@ class VideoChecker(object):
         await sleep(3)
         self.count_become_available += 1
         update_status(video_id, VideoStatus.AVAILABLE)
+
         await self.reply_change(video_id, 'detected a video is available again')
         await self.update_video_caption(get_upload_message_id(video_id), VideoStatus.AVAILABLE)
 
@@ -363,19 +383,19 @@ class VideoChecker(object):
         await sleep(3)
         self.count_become_unavailable += 1
         update_status(video_id, video_status)
-        await self.reply_change(video_id, f'detected new unavailable video\n{video_status.name}')
-        await self.update_video_caption(get_upload_message_id(video_id), video_status)
-        self.count_all_unavailable_by_reasons[video_status] += 1
 
-        if video_status in (VideoStatus.ACCOUNT_TERMINATED, VideoStatus.ACCOUNT_CLOSED):
-            await self.handle_account_terminated_or_closed(video_id)
-
-    async def handle_account_terminated_or_closed(self, video_id: str) -> None:
         message_id = get_upload_message_id(video_id)
         message = await self.app.get_messages(CHAT_ID, message_id)
-        channel_name, channel_url = find_channel_in_message(message)
+        channel = find_channel_in_message(message)
 
-        self.terminated_or_closed_accounts.add((channel_name, channel_url))  # account is equivalent to channel
+        await self.reply_change(video_id, f'detected new unavailable video\n{video_status.name}')
+        await self.update_video_caption(message_id, video_status)
+
+        self.count_all_unavailable_by_reasons[video_status] += 1
+        self.count_all_unavailable_by_channel[channel] += 1
+
+        if video_status in (VideoStatus.ACCOUNT_TERMINATED, VideoStatus.ACCOUNT_CLOSED):
+            self.terminated_or_closed_accounts.add(channel)
 
     async def reply_change(self, video_id: str, text: str) -> None:
         if not self.verbose:

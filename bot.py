@@ -36,7 +36,7 @@ async def check(_, message: Message):
     checker = VideoChecker(message, app)
     await message.reply_text(f'start checking, task(s): {checker.count_all}', quote=True)
     await checker.check_videos()
-    await app.send_message(CHAT_ID, text=checker.generate_check_report())
+    await app.send_message(CHAT_ID, text=checker.generate_check_report(), disable_web_page_preview=True)
     await message.reply_text(
         text=f'all checking tasks finished\n'
              f'total videos: {checker.count_all}\n'
