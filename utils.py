@@ -13,6 +13,7 @@ from pyrogram.enums import MessageEntityType
 from pyrogram.types import Message, MessageEntity
 
 from config import SUPERUSERS, PROXY
+from typedef import Channel
 
 T = TypeVar('T')
 
@@ -60,6 +61,11 @@ def create_video_link(video_id: str) -> str:
 def create_video_link_markdown(video_id: str, title: str = '') -> str:
     """create a YouTube video link in Markdown format"""
     return f'[{title or video_id}]({create_video_link(video_id)})'
+
+
+def create_channel_link_markdown(channel: Channel) -> str:
+    """create a YouTube channel link in Markdown format"""
+    return f'[{channel.name}]({channel.url})'
 
 
 def now_datetime() -> str:
@@ -151,7 +157,7 @@ def remove_hashtags_from_caption(caption: str) -> str:
     return caption
 
 
-def find_channel_in_message(message: Message) -> tuple[str, str]:
+def find_channel_in_message(message: Message) -> Channel:
     """find channel name and URL in a message"""
     # do NOT use str.find() because some of the characters in message.caption may be emojis (UTF-16-LE), which have a length more than 1
     match = search(r'\n频道：(.*?)\n时长', message.caption)
@@ -159,7 +165,7 @@ def find_channel_in_message(message: Message) -> tuple[str, str]:
     for entity in message.caption_entities:
         text = message.caption[entity.offset:entity.offset + entity.length]
         if text == match.group(1) and entity.type is MessageEntityType.TEXT_LINK:
-            return text, entity.url
+            return Channel(text, entity.url)
 
 
 def get_next_retry_ts(error_message: str) -> float:

@@ -20,11 +20,11 @@ from database import (
     get_all_extra_subscription_channel_ids,
     get_backup_videos_total_duration, get_backup_videos_total_size
 )
-from typedef import Task, RetryReason, VideoStatus, HashTag, IncompleteTranscodingError, VideoTooShortError, UniqueQueue, AddResult
+from typedef import Channel, Task, RetryReason, VideoStatus, HashTag, IncompleteTranscodingError, VideoTooShortError, UniqueQueue, AddResult
 from utils import (
     format_file_size, create_message_link, remove_color_codes, slide_window, create_video_link_markdown,
     offset_text_link_entities, remove_hashtags_from_caption, create_video_link,
-    find_channel_in_message, now_datetime, join_list, format_duration, get_next_retry_ts, is_ready
+    find_channel_in_message, now_datetime, join_list, format_duration, get_next_retry_ts, is_ready, create_channel_link_markdown
 )
 from youtube import (
     DownloadManager, get_video_caption, get_video_id, is_video_available_online_batch,
@@ -292,8 +292,8 @@ class VideoChecker(object):
         self.count_all_available = 0
         self.count_all_unavailable = 0
         self.count_all_unavailable_by_reasons: dict[VideoStatus, int] = dict.fromkeys((status for status in VideoStatus), 0)
-        self.count_all_unavailable_by_channel: defaultdict[tuple[str, str], int] = defaultdict(int)
-        self.terminated_or_closed_accounts: set[tuple[str, str]] = set()
+        self.count_all_unavailable_by_channel: defaultdict[Channel, int] = defaultdict(int)
+        self.terminated_or_closed_accounts: set[Channel] = set()
 
     async def update_video_caption(self, message_id: int, video_status: VideoStatus) -> None:
         message = await self.app.get_messages(CHAT_ID, message_id)
@@ -341,8 +341,8 @@ class VideoChecker(object):
 
         if self.terminated_or_closed_accounts:
             lines.append('以下 YouTube 账号已终止或已关闭：')
-            for channel_name, channel_url in self.terminated_or_closed_accounts:
-                lines.append(f'[{channel_name}]({channel_url})')
+            for channel in self.terminated_or_closed_accounts:
+                lines.append(create_channel_link_markdown(channel))
 
         return lines
 
@@ -357,8 +357,8 @@ class VideoChecker(object):
         if self.count_all_unavailable_by_channel:
             lines.append('以下频道有较多视频在源站变得不可观看：')
             channels_sorted_by_count = sorted(self.count_all_unavailable_by_channel.items(), key=lambda _: _[1], reverse=True)
-            for (channel_name, channel_url), count in channels_sorted_by_count:
-                lines.append(f'[{channel_name}]({channel_url})：{count} 个')
+            for channel, count in channels_sorted_by_count:
+                lines.append(f'{create_channel_link_markdown(channel)}：{count} 个')
 
         return lines
 

@@ -1,6 +1,6 @@
 from asyncio import Queue
 from enum import Enum
-from typing import Optional
+from typing import Optional, NamedTuple
 
 from yt_dlp.utils import YoutubeDLError
 
@@ -32,6 +32,11 @@ class UniqueQueue(Queue):
         item = super()._get()  # noqa
         self._set.remove(item)
         return item
+
+
+class Channel(NamedTuple):
+    name: str
+    url: str
 
 
 class Task(object):
