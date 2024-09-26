@@ -12,7 +12,7 @@ from pyrogram import filters
 from pyrogram.enums import MessageEntityType
 from pyrogram.types import Message, MessageEntity
 
-from config import SUPERUSERS, PROXY
+from config import SUPERUSERS, PROXY_HTTPX
 from typedef import Channel
 
 T = TypeVar('T')
@@ -128,7 +128,7 @@ def get_client(proxies: Optional[str] = None, timeout: float = 15, retries: int 
     """get a httpx client"""
     return AsyncClient(
         event_hooks={'request': [on_googleapi_call]},
-        proxies=proxies or PROXY,
+        proxies=proxies or PROXY_HTTPX,
         timeout=timeout,
         transport=AsyncHTTPTransport(retries=retries) if retries else None,
         **kwargs

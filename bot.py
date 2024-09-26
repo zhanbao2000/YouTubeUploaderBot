@@ -4,7 +4,7 @@ from textwrap import dedent
 from pyrogram import Client, filters, idle
 from pyrogram.types import BotCommand, Message
 
-from config import API_ID, API_HASH, BOT_TOKEN, DOWNLOAD_ROOT, CHAT_ID
+from config import API_ID, API_HASH, BOT_TOKEN, DOWNLOAD_ROOT, CHAT_ID, PROXY_TELEGRAM
 from database import (
     get_upload_message_id, insert_extra_subscription,
     get_backup_videos_count, get_unavailable_videos_count, get_extra_subscriptions_count,
@@ -23,7 +23,7 @@ from youtube import (
     get_channel_id_by_link, get_channel_uploads_playlist_id,
 )
 
-app = Client('YouTubeUploaderBot', api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+app = Client('YouTubeUploaderBot', api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN, proxy=PROXY_TELEGRAM)
 
 
 @app.on_message(filters.command('hello'))

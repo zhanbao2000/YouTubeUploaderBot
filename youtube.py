@@ -7,7 +7,7 @@ from typing import Optional
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import YoutubeDLError
 
-from config import PROXY, DOWNLOAD_ROOT, GCP_APIKEY, CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN
+from config import PROXY_YT_DLP, DOWNLOAD_ROOT, GCP_APIKEY, CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN
 from model.channels import Channels, Channel
 from model.playlistItems import PlaylistItems
 from model.subscriptions import Subscriptions
@@ -69,9 +69,8 @@ class DownloadManager(object):
     def _get_base_ydl_options(self) -> dict:
         """get base ydl options"""
         return {
-            'cookiefile': 'cookies.私人.txt',
             'player_client': 'ios',
-            'proxy': PROXY,
+            'proxy': PROXY_YT_DLP,
             'ffmpeg_location': 'bin',
             'concurrent_fragment_downloads': 16,
             'outtmpl': str(self.file),
