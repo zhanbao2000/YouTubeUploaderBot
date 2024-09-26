@@ -170,7 +170,7 @@ def find_channel_in_message(message: Message) -> Channel:
 
 def get_next_retry_ts(error_message: str) -> float:
     """get next retry timestamp from error message"""
-    match = search(r'in (\d+) (minute|hour|day)', error_message)
+    match = search(r'in (\d+) (minute|hour|day|year)', error_message)
 
     if match:
         amount, unit = match.groups()
@@ -180,6 +180,8 @@ def get_next_retry_ts(error_message: str) -> float:
             return time() + int(amount) * 60 * 60
         elif unit == 'day':
             return time() + int(amount) * 24 * 60 * 60
+        elif unit == 'year':
+            return time() + int(amount) * 365 * 24 * 60 * 60
     elif 'in a few moments' in error_message:
         return time() + 24 * 60 * 60
 
