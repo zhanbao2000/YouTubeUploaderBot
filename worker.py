@@ -316,8 +316,8 @@ class VideoChecker(object):
             [f'#视频有效性检查报告 {now_datetime()}'],
             self.generate_check_report_become_unavailable(),
             self.generate_check_report_account_terminated_or_closed(),
-            self.generate_check_report_stats(),
-            self.generate_check_report_many_unavailable()
+            self.generate_check_report_many_unavailable(),
+            self.generate_check_report_stats()
         )
         return '\n'.join(lines)
 
