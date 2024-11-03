@@ -377,7 +377,7 @@ class VideoChecker(object):
         await self.reply_change(video_id, 'detected a video is available again')
         await self.update_video_caption(get_upload_message_id(video_id), VideoStatus.AVAILABLE)
 
-    async def handle_become_not_available(self, video_id: str, video_status: VideoStatus) -> None:
+    async def handle_become_unavailable(self, video_id: str, video_status: VideoStatus) -> None:
         await sleep(3)
         self.count_become_unavailable += 1
         update_status(video_id, video_status)
@@ -414,11 +414,11 @@ class VideoChecker(object):
         else:
             self.count_all_unavailable += 1
 
-        if video_available_online and video_status_local != VideoStatus.AVAILABLE:
+        if video_available_online and video_status_local is not VideoStatus.AVAILABLE:
             await self.handle_become_available(video_id)
-        elif not video_available_online and video_status_local == VideoStatus.AVAILABLE:
+        elif not video_available_online and video_status_local is VideoStatus.AVAILABLE:
             video_status = await loop.run_in_executor(None, DownloadManager(create_video_link(video_id)).get_video_status)
-            await self.handle_become_not_available(video_id, video_status)
+            await self.handle_become_unavailable(video_id, video_status)
 
     async def check_videos(self) -> None:
         for batch_video_ids in slide_window(self.video_ids, 50):
