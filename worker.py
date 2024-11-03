@@ -1,4 +1,4 @@
-from asyncio import QueueEmpty, get_running_loop, sleep, create_task, Task as AsyncTask
+from asyncio import QueueEmpty, get_running_loop, sleep, create_task, to_thread, Task as AsyncTask
 from collections import defaultdict
 from pathlib import Path
 from traceback import format_exc
@@ -183,15 +183,14 @@ class VideoWorker(object):
 
     async def download_video(self, dm: DownloadManager) -> dict:
         """download the video, return the video info"""
-        loop = self.app.loop or get_running_loop()
-        video_info = await loop.run_in_executor(None, dm.download_max_size, self.session_download_max_size)
+        video_info = await to_thread(dm.download_max_size, self.session_download_max_size)
 
         # the 2 GB check here is just to prevent the file size exceeds the Telegram limit,
         # it has nothing to do with the `current_running_download_max_size`
         if (filesize := dm.file.stat().st_size) >= 2e9:
             dm.file.unlink()
             await self.reply_failure(f'file too big: {format_file_size(filesize)}\ntry downloading smaller format')
-            video_info = await loop.run_in_executor(None, dm.download_max_size, 1600)  # retry with smaller format
+            video_info = await to_thread(dm.download_max_size, 1600)  # retry with smaller format
             # if this format is still too big, the video_id will be recorded in db with message_id = 0
 
         return video_info
@@ -409,8 +408,7 @@ class VideoChecker(object):
 
     async def handle_become_unavailable(self, video_id: str) -> None:
         try:
-            loop = self.app.loop or get_running_loop()
-            video_status = await loop.run_in_executor(None, DownloadManager(create_video_link(video_id)).get_video_status)
+            video_status = await to_thread(DownloadManager(create_video_link(video_id)).get_video_status)
         except YoutubeDLError:
             # if encounter DownloadError (Sign in to confirm ...), skip handling this video, and wait for the next check
             return
