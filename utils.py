@@ -16,6 +16,7 @@ from config import SUPERUSERS, PROXY_HTTPX
 from typedef import Channel
 
 T = TypeVar('T')
+START_TIME = time()
 
 
 class APIUsageCounter:
@@ -72,6 +73,12 @@ def now_datetime() -> str:
     """return current time and date, format: 2020-02-20 11:45:14"""
     time_local = localtime(time())
     return strftime('%Y-%m-%d %H:%M:%S', time_local)
+
+
+def get_uptime() -> str:
+    """return uptime of the bot"""
+    duration = int(time() - START_TIME)
+    return format_duration(duration)
 
 
 def format_date(date: str) -> str:

@@ -13,7 +13,7 @@ from database import (
 from typedef import AddResult
 from utils import (
     format_file_size, format_duration, create_message_link, slide_window, is_superuser, get_args, counter,
-    get_memory_usage, get_swap_usage, is_ready
+    get_memory_usage, get_swap_usage, is_ready, get_uptime
 )
 from worker import VideoWorker, VideoChecker, SchedulerManager
 from youtube import (
@@ -67,6 +67,8 @@ async def stat(_, message: Message):
     await message.reply_text(
         text=dedent(f'''\
              statistics:
+             
+             uptime: {get_uptime()}
 
              session upload
                uploaded files: {worker.session_uploaded_files}
