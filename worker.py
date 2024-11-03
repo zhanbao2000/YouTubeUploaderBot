@@ -1,4 +1,4 @@
-from asyncio import QueueEmpty, get_running_loop, sleep
+from asyncio import QueueEmpty, get_running_loop, sleep, create_task, Task as AsyncTask
 from collections import defaultdict
 from pathlib import Path
 from traceback import format_exc
@@ -47,6 +47,36 @@ class VideoWorker(object):
         self.session_download_max_size = 2000  # max size of single format allowed when extracting video info (MB)
         self.session_reply_on_success = True
         self.session_reply_on_failure = True
+
+        self.worker_task: Optional[AsyncTask] = None  # the task of the worker, used to restart the worker
+
+    async def start(self) -> None:
+        """start the worker and worker monitor"""
+        self.worker_task = create_task(self.work())
+        self.worker_task.add_done_callback(self.on_worker_stopped_async_wrapper)
+
+        await self.app.send_message(chat_id=SUPERUSERS[0], text='worker started')
+
+    def on_worker_stopped_async_wrapper(self, task: AsyncTask) -> None:
+        """async wrapper for on_worker_stopped"""
+        loop = self.app.loop or get_running_loop()
+        loop.create_task(self.on_worker_stopped(task))
+
+    async def on_worker_stopped(self, task: AsyncTask) -> None:
+        """handle worker stopped event"""
+        e = task.exception()
+        if isinstance(e, YoutubeDLError):
+            msg = remove_color_codes(e.msg)
+        else:
+            msg = str(e)
+
+        await self.app.send_message(
+            chat_id=SUPERUSERS[0],
+            text=f'worker stopped, reason:\n{msg}\nworker will restart in 10 seconds'
+        )
+
+        await sleep(10)
+        await self.start()
 
     def get_pending_tasks_count(self) -> int:
         """return pending tasks = waiting + current"""
