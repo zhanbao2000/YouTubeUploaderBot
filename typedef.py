@@ -10,7 +10,7 @@ class IncompleteTranscodingError(YoutubeDLError):
 
 
 class VideoTooShortError(RuntimeError):
-    pass
+    video_info: dict
 
 
 class UniqueQueue(Queue):

@@ -184,11 +184,9 @@ class VideoWorker(object):
 
             return thumbnail_message
 
-    async def on_too_short_video(self, dm: DownloadManager) -> None:
+    async def on_too_short_video(self, dm: DownloadManager, e: VideoTooShortError) -> None:
         """handle error of VideoTooShortError"""
-        loop = self.app.loop or get_running_loop()
-        # get video_info because video_info is None
-        video_info = await loop.run_in_executor(None, dm.get_video_info)
+        video_info = e.video_info
         duration = video_info['duration']
 
         insert_video(dm.video_id, 0, 0, video_info, VideoStatus.TOO_SHORT)
@@ -261,8 +259,8 @@ class VideoWorker(object):
                 video_info = await self.download_video(dm)
                 thumbnail_message = await self.upload_video(dm.file, video_info)
 
-            except VideoTooShortError:
-                await self.on_too_short_video(dm)
+            except VideoTooShortError as e:
+                await self.on_too_short_video(dm, e)
 
             except YoutubeDLError as e:
                 await self.on_download_error(dm, e)
