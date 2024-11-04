@@ -64,6 +64,8 @@ class VideoWorker(object):
 
     async def on_worker_stopped(self, task: AsyncTask) -> None:
         """handle worker stopped event"""
+        self.is_working = False
+
         e = task.exception()
         if isinstance(e, YoutubeDLError):
             msg = remove_color_codes(e.msg)
