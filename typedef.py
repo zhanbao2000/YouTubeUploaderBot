@@ -10,7 +10,9 @@ class IncompleteTranscodingError(YoutubeDLError):
 
 
 class VideoTooShortError(RuntimeError):
-    video_info: dict
+    def __init__(self, video_info: dict):
+        self.video_info = video_info
+        super().__init__()
 
 
 class UniqueQueue(Queue):
