@@ -19,7 +19,7 @@ T = TypeVar('T')
 START_TIME = time()
 
 
-class APIUsageCounter:
+class APIUsageCounter(object):
     def __init__(self):
         self.timestamps = deque()
 
