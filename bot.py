@@ -12,7 +12,7 @@ from database import (
 )
 from typedef import AddResult
 from utils import (
-    format_file_size, format_duration, create_message_link, slide_window, is_superuser, get_args, counter,
+    format_file_size, format_duration, create_message_link, batched, is_superuser, get_args, counter,
     get_memory_usage, get_swap_usage, is_ready, get_uptime
 )
 from worker import VideoWorker, VideoChecker, SchedulerManager
@@ -181,7 +181,7 @@ async def add_subscription(_, message: Message):
 
     await message.reply_text(f'get {len(channel_ids)} channels ({get_extra_subscriptions_count()} in extra)', quote=True)
 
-    for batch_channel_ids in slide_window(channel_ids, 50):
+    for batch_channel_ids in batched(channel_ids, 50):
         playlist_ids = await get_channel_uploads_playlist_id_batch(batch_channel_ids)
 
         for playlist_id in playlist_ids.values():

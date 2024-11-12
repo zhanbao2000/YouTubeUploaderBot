@@ -22,7 +22,7 @@ from database import (
 )
 from typedef import Channel, Task, RetryReason, VideoStatus, HashTag, IncompleteTranscodingError, VideoTooShortError, UniqueQueue, AddResult
 from utils import (
-    format_file_size, create_message_link, remove_color_codes, slide_window, create_video_link_markdown,
+    format_file_size, create_message_link, remove_color_codes, batched, create_video_link_markdown,
     offset_text_link_entities, remove_hashtags_from_caption, create_video_link,
     find_channel_in_message, now_datetime, join_list, format_duration, get_next_retry_ts, is_ready, create_channel_link_markdown
 )
@@ -455,7 +455,7 @@ class VideoChecker(object):
             await self.handle_become_unavailable(video_id)
 
     async def check_videos(self) -> None:
-        for batch_video_ids in slide_window(self.video_ids, 50):
+        for batch_video_ids in batched(self.video_ids, 50):
             batch_availability = await is_video_available_online_batch(batch_video_ids)
 
             for video_id in batch_video_ids:
@@ -511,7 +511,7 @@ class SchedulerManager(object):
         video_urls = []
         channel_ids = await get_all_my_subscription_channel_ids() + get_all_extra_subscription_channel_ids()
 
-        for batch_channel_ids in slide_window(channel_ids, 50):
+        for batch_channel_ids in batched(channel_ids, 50):
             playlist_ids = await get_channel_uploads_playlist_id_batch(batch_channel_ids)
 
             for playlist_id in playlist_ids.values():

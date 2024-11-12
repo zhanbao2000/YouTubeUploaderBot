@@ -119,10 +119,14 @@ def remove_color_codes(text: str) -> str:
     return sub(r'\x1b\[[0-9;]*m', '', text)
 
 
-def slide_window(lst: list[T], window_size: int) -> Generator[list[T], None, None]:
-    """generator function that yields window_size elements at a time"""
-    for start in range(0, len(lst), window_size):
-        yield lst[start:start + window_size]
+def batched(lst: list[T], n: int) -> Generator[list[T], None, None]:
+    """
+    generator function that yields n elements at a time
+
+    roughly equivalent to ``itertools.batched()``, which is available in Python 3.12
+    """
+    for start in range(0, len(lst), n):
+        yield lst[start:start + n]
 
 
 async def on_googleapi_call(request: Request):
