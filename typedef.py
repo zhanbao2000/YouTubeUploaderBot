@@ -1,6 +1,6 @@
 from asyncio import Queue
 from enum import Enum
-from typing import Optional, NamedTuple
+from typing import NamedTuple, Optional
 
 from yt_dlp.utils import YoutubeDLError
 

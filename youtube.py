@@ -7,13 +7,13 @@ from typing import Optional
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import YoutubeDLError
 
-from config import PROXY_YT_DLP, DOWNLOAD_ROOT, GCP_APIKEY, CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN
-from model.channels import Channels, Channel
+from config import CLIENT_ID, CLIENT_SECRET, DOWNLOAD_ROOT, GCP_APIKEY, PROXY_YT_DLP, REFRESH_TOKEN
+from model.channels import Channel, Channels
 from model.playlistItems import PlaylistItems
 from model.subscriptions import Subscriptions
 from model.videos import Videos
-from typedef import VideoStatus, IncompleteTranscodingError, VideoTooShortError
-from utils import format_file_size, format_date, get_client, create_video_link
+from typedef import IncompleteTranscodingError, VideoStatus, VideoTooShortError
+from utils import create_video_link, format_date, format_file_size, get_client
 
 
 class Format(object):

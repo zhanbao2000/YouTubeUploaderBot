@@ -4,23 +4,43 @@ from textwrap import dedent
 from pyrogram import Client, filters, idle
 from pyrogram.types import BotCommand, Message
 
-from config import API_ID, API_HASH, BOT_TOKEN, DOWNLOAD_ROOT, CHAT_ID, PROXY_TELEGRAM
+from config import API_HASH, API_ID, BOT_TOKEN, CHAT_ID, DOWNLOAD_ROOT, PROXY_TELEGRAM
 from database import (
-    get_upload_message_id, insert_extra_subscription,
-    get_backup_videos_count, get_unavailable_videos_count, get_extra_subscriptions_count,
-    get_all_extra_subscription_channel_ids, get_backup_videos_total_size, get_backup_videos_total_duration,
+    get_all_extra_subscription_channel_ids,
+    get_backup_videos_count,
+    get_backup_videos_total_duration,
+    get_backup_videos_total_size,
+    get_extra_subscriptions_count,
+    get_unavailable_videos_count,
+    get_upload_message_id,
+    insert_extra_subscription,
 )
 from typedef import AddResult
 from utils import (
-    format_file_size, format_duration, create_message_link, batched, is_superuser, get_args, counter,
-    get_memory_usage, get_swap_usage, is_ready, get_uptime
+    batched,
+    counter,
+    create_message_link,
+    format_duration,
+    format_file_size,
+    get_args,
+    get_memory_usage,
+    get_swap_usage,
+    get_uptime,
+    is_ready,
+    is_superuser,
 )
-from worker import VideoWorker, VideoChecker, SchedulerManager
+from worker import SchedulerManager, VideoChecker, VideoWorker
 from youtube import (
-    get_video_id, get_playlist_id, get_channel_id,
-    get_all_video_urls_from_playlist, get_all_stream_urls_from_holoinfo,
-    get_channel_info, get_all_my_subscription_channel_ids, get_channel_uploads_playlist_id_batch,
-    get_channel_id_by_link, get_channel_uploads_playlist_id,
+    get_all_my_subscription_channel_ids,
+    get_all_stream_urls_from_holoinfo,
+    get_all_video_urls_from_playlist,
+    get_channel_id,
+    get_channel_id_by_link,
+    get_channel_info,
+    get_channel_uploads_playlist_id,
+    get_channel_uploads_playlist_id_batch,
+    get_playlist_id,
+    get_video_id,
 )
 
 app = Client('YouTubeUploaderBot', api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN, proxy=PROXY_TELEGRAM)
@@ -287,6 +307,7 @@ async def youtube_url_regex(_, message: Message):
         reply = f'unknown add result {add_result}'
 
     await message.reply_text(reply, quote=True)
+
 
 if __name__ == '__main__':
     app.start()

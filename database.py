@@ -1,16 +1,16 @@
-import sqlite3
+from sqlite3 import connect, Cursor, IntegrityError
 
+from config import DATABASE_FILE
 from typedef import VideoStatus
 from utils import parse_upload_timestamp
-from config import DATABASE_FILE
 
 
 class Connect:
     def __init__(self, file_path):
         self.file_path = file_path
 
-    def __enter__(self) -> sqlite3.Cursor:
-        self.conn = sqlite3.connect(self.file_path)
+    def __enter__(self) -> Cursor:
+        self.conn = connect(self.file_path)
         self.c = self.conn.cursor()
         return self.c
 
@@ -45,7 +45,7 @@ def insert_extra_subscription(channel_id: str) -> bool:
         with Connect(DATABASE_FILE) as c:
             c.execute('INSERT INTO extra_subscription (channel_id) VALUES (?)', (channel_id,))
         return True
-    except sqlite3.IntegrityError:  # channel_id already exists
+    except IntegrityError:  # channel_id already exists
         return False
 
 

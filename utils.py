@@ -2,9 +2,9 @@ from collections import deque
 from datetime import datetime
 from os import getpid
 from platform import system
-from re import sub, search
-from time import time, localtime, strftime
-from typing import Optional, TypeVar, Generator
+from re import search, sub
+from time import localtime, strftime, time
+from typing import Generator, Optional, TypeVar
 
 from httpx import AsyncClient, AsyncHTTPTransport, Request
 from psutil import Process
@@ -12,7 +12,7 @@ from pyrogram import filters
 from pyrogram.enums import MessageEntityType
 from pyrogram.types import Message, MessageEntity
 
-from config import SUPERUSERS, PROXY_HTTPX
+from config import PROXY_HTTPX, SUPERUSERS
 from typedef import Channel
 
 T = TypeVar('T')

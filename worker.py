@@ -1,10 +1,10 @@
-from asyncio import QueueEmpty, get_running_loop, sleep, create_task, to_thread, Task as AsyncTask
+from asyncio import QueueEmpty, Task as AsyncTask, create_task, get_running_loop, sleep, to_thread
 from collections import defaultdict
 from pathlib import Path
 from traceback import format_exc
 from typing import Iterable, Optional
 
-from apscheduler.events import JobExecutionEvent, EVENT_JOB_ERROR
+from apscheduler.events import EVENT_JOB_ERROR, JobExecutionEvent
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.base import STATE_PAUSED
 from pyrogram import Client
@@ -13,23 +13,56 @@ from pyrogram.types import Message
 from pytz import timezone
 from yt_dlp.utils import YoutubeDLError
 
-from config import DOWNLOAD_ROOT, CHAT_ID, SUPERUSERS
+from config import CHAT_ID, DOWNLOAD_ROOT, SUPERUSERS
 from database import (
-    insert_video, is_in_database,
-    get_upload_message_id, update_status, get_status, get_all_video_ids,
     get_all_extra_subscription_channel_ids,
-    get_backup_videos_total_duration, get_backup_videos_total_size
+    get_all_video_ids,
+    get_backup_videos_total_duration,
+    get_backup_videos_total_size,
+    get_status,
+    get_upload_message_id,
+    insert_video,
+    is_in_database,
+    update_status,
 )
-from typedef import Channel, Task, RetryReason, VideoStatus, HashTag, IncompleteTranscodingError, VideoTooShortError, UniqueQueue, AddResult
+from typedef import (
+    AddResult,
+    Channel,
+    HashTag,
+    IncompleteTranscodingError,
+    RetryReason,
+    Task,
+    UniqueQueue,
+    VideoStatus,
+    VideoTooShortError,
+)
 from utils import (
-    format_file_size, create_message_link, remove_color_codes, batched, create_video_link_markdown,
-    offset_text_link_entities, remove_hashtags_from_caption, create_video_link,
-    find_channel_in_message, now_datetime, join_list, format_duration, get_next_retry_ts, is_ready, create_channel_link_markdown
+    batched,
+    create_channel_link_markdown,
+    create_message_link,
+    create_video_link,
+    create_video_link_markdown,
+    find_channel_in_message,
+    format_duration,
+    format_file_size,
+    get_next_retry_ts,
+    is_ready,
+    join_list,
+    now_datetime,
+    offset_text_link_entities,
+    remove_color_codes,
+    remove_hashtags_from_caption,
 )
 from youtube import (
-    DownloadManager, get_video_caption, get_video_id, is_video_available_online_batch,
-    get_all_my_subscription_channel_ids, get_channel_uploads_playlist_id_batch, get_all_video_urls_from_playlist,
-    get_all_stream_urls_from_holoinfo, get_thumbnail
+    DownloadManager,
+    get_all_my_subscription_channel_ids,
+    get_all_stream_urls_from_holoinfo,
+    get_all_video_urls_from_playlist,
+    get_channel_uploads_playlist_id_batch,
+    get_thumbnail,
+    get_video_caption,
+    get_video_id,
+    is_video_available_online_batch,
 )
 
 
