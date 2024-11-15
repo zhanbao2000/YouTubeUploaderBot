@@ -74,6 +74,7 @@ class RetryReason(str, Enum):
     LIVE_NOT_STARTED = 'this live has not yet started'
     NETWORK_ERROR = 'a network error occurs when upload this video'
     INCOMPLETE_TRANSCODING = 'transcoding for this video is not yet complete on YouTube servers'
+    LOGIN_REQUIRED = 'login is required to access this video'
 
 
 class VideoStatus(int, Enum):

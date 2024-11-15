@@ -284,6 +284,8 @@ class VideoWorker(object):
             retry_reason = RetryReason.LIVE_NOT_STARTED
         elif isinstance(e, IncompleteTranscodingError):
             retry_reason = RetryReason.INCOMPLETE_TRANSCODING
+        elif 'This helps protect our community' in msg:
+            retry_reason = RetryReason.LOGIN_REQUIRED
 
         if retry_reason:
             self.retry_tasks[dm.url] = get_next_retry_ts(msg)
