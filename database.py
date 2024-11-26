@@ -49,6 +49,13 @@ def insert_extra_subscription(channel_id: str) -> bool:
         return False
 
 
+def delete_extra_subscription(channel_id: str) -> bool:
+    """delete an extra subscription from database"""
+    with Connect(DATABASE_FILE) as c:
+        c.execute('DELETE FROM extra_subscription WHERE channel_id = ?', (channel_id,))
+        return c.rowcount > 0
+
+
 def update_status(video_id: str, video_status: VideoStatus) -> None:
     """update the status of a video in the database"""
     with Connect(DATABASE_FILE) as c:

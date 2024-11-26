@@ -6,6 +6,7 @@ from pyrogram.types import BotCommand, Message
 
 from config import API_HASH, API_ID, BOT_TOKEN, CHAT_ID, DOWNLOAD_ROOT, PROXY_TELEGRAM
 from database import (
+    delete_extra_subscription,
     get_all_extra_subscription_channel_ids,
     get_backup_videos_count,
     get_backup_videos_total_duration,
@@ -237,6 +238,20 @@ async def add_extra_subscription(_, message: Message):
                  f'[{channel.snippet.title}](https://www.youtube.com/channel/{channel_id})',
             quote=True
         )
+
+
+@app.on_message(filters.command('remove_duplicated_subscription') & is_superuser)
+async def remove_duplicated_subscription(_, message: Message):
+    channel_ids_extra_subscription = get_all_extra_subscription_channel_ids()
+    channel_ids_my_subscription = await get_all_my_subscription_channel_ids()
+
+    count_removed = sum(
+        1
+        for channel_id in channel_ids_extra_subscription
+        if channel_id in channel_ids_my_subscription and delete_extra_subscription(channel_id)
+    )
+
+    await message.reply_text(f'{count_removed} duplicated subscription(s) removed', quote=True)
 
 
 @app.on_message(filters.command('set_download_max_size') & is_superuser)
