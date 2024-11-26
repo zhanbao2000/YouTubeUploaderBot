@@ -338,6 +338,7 @@ if __name__ == '__main__':
         BotCommand(command='add_channel', description='all the videos uploaded by the channel'),
         BotCommand(command='add_subscription', description='add recent subscription feeds'),
         BotCommand(command='add_extra_subscription', description='add channel into separated subscription list'),
+        BotCommand(command='remove_duplicated_subscription', description='remove duplicated subscription'),
         BotCommand(command='set_download_max_size', description='set max size of downloading video'),
         BotCommand(command='toggle_reply_on_success', description='change success notification setting'),
         BotCommand(command='toggle_reply_on_failure', description='change failure notification setting'),
