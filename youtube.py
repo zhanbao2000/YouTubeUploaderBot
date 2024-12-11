@@ -78,6 +78,16 @@ class DownloadManager(object):
             'socket_timeout': 90
         }
 
+    def _get_ydl_options_with_cookies(self) -> dict:
+        """get ydl options with cookies"""
+        # If downloading can be done WITHOUT using cookies,
+        # then try NOT to use cookies to avoid them becoming invalid.
+        ydl_options = self._get_base_ydl_options()
+        ydl_options.update({
+            'cookiefile': 'cookies.txt',  # original dump name: cookies.私人.txt
+        })
+        return ydl_options
+
     def _download(self, ydl_options: dict) -> dict:
         """download the video and return the video info"""
         with YoutubeDL(ydl_options) as ydl:
@@ -145,9 +155,13 @@ class DownloadManager(object):
 
         return result
 
-    def download_max_size(self, max_size_mb: int) -> dict:
+    def download_max_size(self, max_size_mb: int, use_cookies: bool = False) -> dict:
         """download the largest video but no bigger than given size"""
-        ydl_options = self._get_base_ydl_options()
+        if use_cookies:
+            ydl_options = self._get_ydl_options_with_cookies()
+        else:
+            ydl_options = self._get_base_ydl_options()
+
         ydl_options.update({
             'format': 'bv+ba/b',
             'format_sort': [f'size:{max_size_mb or 1}M'],  # at least 1 MB

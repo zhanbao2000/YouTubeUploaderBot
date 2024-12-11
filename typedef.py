@@ -18,6 +18,8 @@ class VideoTooShortError(RuntimeError):
 class UniqueQueue(Queue):
     """A queue that ensures all items are unique (set-like). It supports the `in` operator to check for item existence."""
 
+    # use 'noqa' to ignore the warning of calling protected member
+
     def __init__(self, maxsize=0):
         super().__init__(maxsize)
         self._set = set()
@@ -35,6 +37,15 @@ class UniqueQueue(Queue):
         self._set.remove(item)
         return item
 
+    def put_left_nowait(self, item):
+        """Put an item into the front of the queue."""
+        if item not in self._set:
+            self._queue.appendleft(item)  # noqa
+            self._set.add(item)
+            self._unfinished_tasks += 1  # noqa
+            self._finished.clear()  # noqa
+            self._wakeup_next(self._getters)  # noqa
+
 
 class Channel(NamedTuple):
     name: str
@@ -42,10 +53,17 @@ class Channel(NamedTuple):
 
 
 class Task(object):
-    def __init__(self, url: str, chat_id: Optional[int] = None, message_id: Optional[int] = None):
+    def __init__(
+            self,
+            url: str,
+            chat_id: Optional[int] = None,
+            message_id: Optional[int] = None,
+            use_cookies: Optional[bool] = False,
+    ):
         self.url = url
         self.chat_id = chat_id
         self.message_id = message_id
+        self.use_cookies = use_cookies
 
     # override __hash__() and __eq__() so that set() only considers url when deduplicating
 

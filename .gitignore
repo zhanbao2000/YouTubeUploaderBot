@@ -139,3 +139,6 @@ database.dat
 
 # pyrogram generated
 *.session
+
+# cookies.txt
+/cookies.txt

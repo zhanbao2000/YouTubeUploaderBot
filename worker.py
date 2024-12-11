@@ -216,16 +216,16 @@ class VideoWorker(object):
         else:
             await self.reply_success('all tasks finished')
 
-    async def download_video(self, dm: DownloadManager) -> dict:
+    async def download_video(self, dm: DownloadManager, use_cookies: bool = False) -> dict:
         """download the video, return the video info"""
-        video_info = await to_thread(dm.download_max_size, self.session_download_max_size)
+        video_info = await to_thread(dm.download_max_size, self.session_download_max_size, use_cookies)
 
         # the 2 GB check here is just to prevent the file size exceeds the Telegram limit,
         # it has nothing to do with the `current_running_download_max_size`
         if (filesize := dm.file.stat().st_size) >= 2e9:
             dm.file.unlink()
             await self.reply_failure(f'file too big: {format_file_size(filesize)}\ntry downloading smaller format')
-            video_info = await to_thread(dm.download_max_size, 1600)  # retry with smaller format
+            video_info = await to_thread(dm.download_max_size, 1600, use_cookies)  # retry with smaller format
             # if this format is still too big, the video_id will be recorded in db with message_id = 0
 
         return video_info
@@ -257,8 +257,23 @@ class VideoWorker(object):
         await self.reply_failure(f'error on downloading this video: {create_video_link_markdown(dm.video_id)}\n'
                                  f'Too short video, duration: {duration}\n')
 
-    async def on_download_error(self, dm: DownloadManager, e: YoutubeDLError) -> None:
-        """handle error of YoutubeDLError"""
+    async def on_error_should_use_cookies(self, dm: DownloadManager, e: YoutubeDLError) -> bool:
+        """handle error of video that should use cookies"""
+        msg = remove_color_codes(e.msg)
+        task = self.current_task
+
+        if 'This video may be inappropriate for some users' in msg and not task.use_cookies:
+            task.use_cookies = True
+            # add this task into the front of the queue to retry with cookies immediately
+            self.video_queue.put_left_nowait(task)
+            await self.reply_failure(f'encountered age-restricted video, retrying with cookies immediately: '
+                                     f'{create_video_link_markdown(dm.video_id)}')
+            return True
+
+        return False
+
+    async def on_error_should_retry(self, dm: DownloadManager, e: YoutubeDLError) -> bool:
+        """handle error of video that should retry"""
         msg = remove_color_codes(e.msg)
         network_error_tokens = (
             'The read operation timed out',
@@ -275,7 +290,6 @@ class VideoWorker(object):
             'This live event will begin in',
             'Watch on the latest version of YouTube'
         )
-
         retry_reason = ''
 
         if any(token in msg for token in network_error_tokens):
@@ -285,14 +299,27 @@ class VideoWorker(object):
         elif isinstance(e, IncompleteTranscodingError):
             retry_reason = RetryReason.INCOMPLETE_TRANSCODING
         elif 'This helps protect our community' in msg:
+            # when encountering LOGIN_REQUIRED, retrying later may alleviate this error
             retry_reason = RetryReason.LOGIN_REQUIRED
 
         if retry_reason:
             self.retry_tasks[dm.url] = get_next_retry_ts(msg)
             await self.reply_failure(f'{retry_reason}: {create_video_link_markdown(dm.video_id)}\n{msg}\n'
                                      f'this url has been saved to retry list, you can retry it later')
-        else:
-            await self.reply_failure(f'error on downloading this video: {create_video_link_markdown(dm.video_id)}\n{msg}\n')
+            return True
+
+        return False
+
+    async def on_download_error(self, dm: DownloadManager, e: YoutubeDLError) -> None:
+        """handle error of YoutubeDLError"""
+        msg = remove_color_codes(e.msg)
+
+        if not any((
+            await self.on_error_should_use_cookies(dm, e),
+            await self.on_error_should_retry(dm, e)
+        )):
+            await self.reply_failure(f'error on downloading this video: '
+                                     f'{create_video_link_markdown(dm.video_id)}\n{msg}')
 
     async def on_finish(self, dm: DownloadManager, video_info: Optional[dict], thumbnail_message: Optional[Message]) -> None:
         """handle finish event"""
@@ -322,7 +349,7 @@ class VideoWorker(object):
             thumbnail_message: Optional[Message] = None  # for upload
 
             try:
-                video_info = await self.download_video(dm)
+                video_info = await self.download_video(dm, self.current_task.use_cookies)
                 thumbnail_message = await self.upload_video(dm.file, video_info)
 
             except VideoTooShortError as e:
