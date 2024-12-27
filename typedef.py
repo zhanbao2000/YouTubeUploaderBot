@@ -97,6 +97,7 @@ class RetryReason(str, Enum):
 
 class VideoStatus(int, Enum):
     # positive values are available or can be made available
+    MEMBERS_ONLY = 3
     TOO_SHORT = 2
     AVAILABLE = 1
 
@@ -110,7 +111,7 @@ class VideoStatus(int, Enum):
     ACCOUNT_TERMINATED = -4
     ACCOUNT_CLOSED = -5
     NUDITY_OR_SEXUAL_CONTENT = -6
-    MEMBERS_ONLY = -7
+
     VIOLATE_TOS = -8
 
 

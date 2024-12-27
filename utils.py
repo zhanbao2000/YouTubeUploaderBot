@@ -226,7 +226,7 @@ def get_swap_usage() -> int:
     return swap * 1024
 
 
-def parse_upload_timestamp(video_info: dict) -> datetime:
+def parse_upload_timestamp(video_info: dict) -> Optional[datetime]:
     """parse upload timestamp to datetime object"""
     if video_info.get('release_timestamp') is not None:
         return datetime.fromtimestamp(video_info['release_timestamp'])
@@ -234,7 +234,7 @@ def parse_upload_timestamp(video_info: dict) -> datetime:
         return datetime.strptime(video_info['release_date'], '%Y%m%d')
     elif video_info.get('upload_date') is not None:
         return datetime.strptime(video_info['upload_date'], '%Y%m%d')
-    raise ValueError('No upload timestamp found in video_info')
+    return None
 
 
 def join_list(separator: list[T], *lists: list[T]) -> Generator[T, None, None]:

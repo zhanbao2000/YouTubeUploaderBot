@@ -312,11 +312,29 @@ class VideoWorker(object):
 
         return False
 
+    async def on_error_members_only_videos(self, dm: DownloadManager, e: YoutubeDLError) -> bool:
+        """handle error of members-only videos"""
+        msg = remove_color_codes(e.msg)
+        members_only_tokens = (
+            'Join this channel to get access to members-only content like this video, and other exclusive perks',
+            'This video is available to this channel\'s members on level'
+        )
+
+        if any(token in msg for token in members_only_tokens):
+            # yt-dlp cannot fetch video_info of members-only videos, so the video_info should be empty
+            insert_video(dm.video_id, 0, 0, {}, VideoStatus.MEMBERS_ONLY)
+            await self.reply_failure(f'error on downloading this member-only video: '
+                                     f'{create_video_link_markdown(dm.video_id)}')
+            return True
+
+        return False
+
     async def on_download_error(self, dm: DownloadManager, e: YoutubeDLError) -> None:
         """handle error of YoutubeDLError"""
         msg = remove_color_codes(e.msg)
 
         if not any((
+            await self.on_error_members_only_videos(dm, e),
             await self.on_error_should_use_cookies(dm, e),
             await self.on_error_should_retry(dm, e)
         )):

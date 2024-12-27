@@ -146,6 +146,8 @@ class DownloadManager(object):
                 result = VideoStatus.VIOLATE_TOS
             elif 'Join this channel to get access to members-only content like this video, and other exclusive perks' in msg:
                 result = VideoStatus.MEMBERS_ONLY
+            elif 'This video is available to this channel\'s members on level' in msg:
+                result = VideoStatus.MEMBERS_ONLY
             elif 'This video is unavailable' in msg:
                 result = VideoStatus.UNAVAILABLE
             else:

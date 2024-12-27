@@ -32,8 +32,8 @@ def is_in_database(video_id: str) -> bool:
 def insert_video(video_id: str, message_id: int, size: int, video_info: dict, status: VideoStatus) -> None:
     """insert a video_id into the database and record its message_id when the video is uploaded"""
     with Connect(DATABASE_FILE) as c:
-        title = video_info['title']
-        duration = video_info['duration']
+        title = video_info.get('title')
+        duration = video_info.get('duration')
         upload_ts = parse_upload_timestamp(video_info)
         c.execute('INSERT INTO video (video_id, message_id, title, duration, size, upload_ts, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
                   (video_id, message_id, title, duration, size, upload_ts, status))
