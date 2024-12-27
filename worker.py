@@ -592,6 +592,7 @@ class SchedulerManager(object):
         """add recent subscription feeds"""
         video_urls = []
         channel_ids = await get_all_my_subscription_channel_ids() + get_all_extra_subscription_channel_ids()
+        channel_ids = list(set(channel_ids))
 
         for batch_channel_ids in batched(channel_ids, 50):
             playlist_ids = await get_channel_uploads_playlist_id_batch(batch_channel_ids)

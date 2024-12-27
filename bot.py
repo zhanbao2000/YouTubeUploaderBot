@@ -199,6 +199,7 @@ async def add_channel(_, message: Message):
 async def add_subscription(_, message: Message):
     video_urls = []
     channel_ids = await get_all_my_subscription_channel_ids() + get_all_extra_subscription_channel_ids()
+    channel_ids = list(set(channel_ids))
 
     await message.reply_text(f'get {len(channel_ids)} channels ({get_extra_subscriptions_count()} in extra)', quote=True)
 
