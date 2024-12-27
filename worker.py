@@ -278,12 +278,14 @@ class VideoWorker(object):
         network_error_tokens = (
             'The read operation timed out',
             'Connection reset by peer',
+            'HTTP Error 403: Forbidden',
             'HTTP Error 503: Service Unavailable',
             'The handshake operation timed out',
             'Read timed out',
             'Remote end closed connection without response',
             'A network error has occurred',
-            'bytes read'
+            'bytes read',
+            'EOF occurred in violation of protocol'
         )
         live_not_started_error_tokens = (
             'Premieres in',

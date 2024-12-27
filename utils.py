@@ -195,8 +195,6 @@ def get_next_retry_ts(error_message: str) -> float:
             return time() + int(amount) * 365 * 24 * 60 * 60
     elif 'in a few moments' in error_message:
         return time() + 24 * 60 * 60
-    elif 'This helps protect our community' in error_message:
-        return time()
 
     return time()
 
