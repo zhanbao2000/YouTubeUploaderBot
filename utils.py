@@ -114,6 +114,11 @@ def format_duration(duration: int) -> str:
         return f'{seconds}秒'
 
 
+def format_timestamp(timestamp: float) -> str:
+    """convert timestamp to human-readable format：2020-02-20 11:45:14"""
+    return strftime('%Y-%m-%d %H:%M:%S', localtime(timestamp))
+
+
 def remove_color_codes(text: str) -> str:
     """remove color codes"""
     return sub(r'\x1b\[[0-9;]*m', '', text)

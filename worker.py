@@ -45,6 +45,7 @@ from utils import (
     find_channel_in_message,
     format_duration,
     format_file_size,
+    format_timestamp,
     get_next_retry_ts,
     is_ready,
     join_list,
@@ -305,9 +306,10 @@ class VideoWorker(object):
             retry_reason = RetryReason.LOGIN_REQUIRED
 
         if retry_reason:
-            self.retry_tasks[dm.url] = get_next_retry_ts(msg)
+            next_retry_ts = get_next_retry_ts(msg)
+            self.retry_tasks[dm.url] = next_retry_ts
             await self.reply_failure(f'{retry_reason}: {create_video_link_markdown(dm.video_id)}\n{msg}\n'
-                                     f'this url has been saved to retry list, you can retry it later')
+                                     f'this url has been saved to retry list, it will retry after {format_timestamp(next_retry_ts)}')
             return True
 
         return False
