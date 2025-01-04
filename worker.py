@@ -222,10 +222,12 @@ class VideoWorker(object):
         video_info = await to_thread(dm.download_max_size, self.session_download_max_size, use_cookies)
 
         # the 2 GB check here is just to prevent the file size exceeds the Telegram limit,
-        # it has nothing to do with the `current_running_download_max_size`
+        # it has nothing to do with the `session_download_max_size`
         if (filesize := dm.file.stat().st_size) >= 2e9:
             dm.file.unlink()
-            await self.reply_failure(f'file too big: {format_file_size(filesize)}\ntry downloading smaller format')
+            await self.reply_failure(f'{create_video_link_markdown(dm.video_id)}\n'
+                                     f'file too big: {format_file_size(filesize)}\n'
+                                     f'try downloading smaller format')
             video_info = await to_thread(dm.download_max_size, 1600, use_cookies)  # retry with smaller format
             # if this format is still too big, the video_id will be recorded in db with message_id = 0
 
