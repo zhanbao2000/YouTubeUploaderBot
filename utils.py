@@ -2,6 +2,7 @@ from collections import deque
 from datetime import datetime
 from os import getpid
 from platform import system
+from random import choice
 from re import search, sub
 from time import localtime, strftime, time
 from typing import Generator, Optional, TypeVar
@@ -12,7 +13,7 @@ from pyrogram import filters
 from pyrogram.enums import MessageEntityType
 from pyrogram.types import Message, MessageEntity
 
-from config import PROXY_HTTPX, SUPERUSERS
+from config import PROXY_HTTPX, PROXY_YT_DLP, SUPERUSERS
 from typedef import Channel
 
 T = TypeVar('T')
@@ -46,6 +47,15 @@ class APIUsageCounter(object):
         cutoff = time() - 60 * 60 * 24  # One day ago
         while self.timestamps and self.timestamps[0] < cutoff:
             self.timestamps.popleft()
+
+
+def get_proxy_yt_dlp() -> Optional[str]:
+    """get a proxy for yt-dlp"""
+    if isinstance(PROXY_YT_DLP, (str, type(None))):
+        return PROXY_YT_DLP
+    elif isinstance(PROXY_YT_DLP, list):
+        return choice(PROXY_YT_DLP)
+    raise ValueError('PROXY_YT_DLP must be a str, a list of strs, or None')
 
 
 def create_message_link(chat_id: int, message_id: int) -> str:

@@ -7,13 +7,13 @@ from typing import Optional
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import YoutubeDLError
 
-from config import CLIENT_ID, CLIENT_SECRET, DOWNLOAD_ROOT, GCP_APIKEY, PROXY_YT_DLP, REFRESH_TOKEN
+from config import CLIENT_ID, CLIENT_SECRET, DOWNLOAD_ROOT, GCP_APIKEY, REFRESH_TOKEN
 from model.channels import Channel, Channels
 from model.playlistItems import PlaylistItems
 from model.subscriptions import Subscriptions
 from model.videos import Videos
 from typedef import IncompleteTranscodingError, VideoStatus, VideoTooShortError
-from utils import create_video_link, format_date, format_file_size, get_client
+from utils import create_video_link, format_date, format_file_size, get_client, get_proxy_yt_dlp
 
 
 class Format(object):
@@ -70,7 +70,7 @@ class DownloadManager(object):
         """get base ydl options"""
         return {
             'player_client': 'ios',
-            'proxy': PROXY_YT_DLP,
+            'proxy': get_proxy_yt_dlp(),
             'ffmpeg_location': 'bin',
             'concurrent_fragment_downloads': 16,
             'outtmpl': str(self.file),

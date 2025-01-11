@@ -142,3 +142,6 @@ database.dat
 
 # cookies.txt
 /cookies.txt
+
+# proxy
+proxy-cluster.sh

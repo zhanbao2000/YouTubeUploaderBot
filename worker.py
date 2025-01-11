@@ -288,7 +288,8 @@ class VideoWorker(object):
             'Remote end closed connection without response',
             'A network error has occurred',
             'bytes read',
-            'EOF occurred in violation of protocol'
+            'EOF occurred in violation of protocol',
+            'Failed to extract any player response'
         )
         live_not_started_error_tokens = (
             'Premieres in',
