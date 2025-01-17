@@ -130,17 +130,6 @@ async def stat(_, message: Message):
     )
 
 
-@app.on_message(filters.command('clear') & is_superuser)
-async def clear(_, message: Message):
-    await message.reply_text(
-        text=f'{worker.get_queue_size()} pending task(s) cancelled\n'
-             f'{len(worker.retry_tasks)} retry task(s) cancelled',
-        quote=True
-    )
-    await worker.clear_queue()
-    worker.retry_tasks.clear()
-
-
 @app.on_message(filters.command('add_list') & is_superuser)
 async def add_list(_, message: Message):
     url = get_args(message)
@@ -255,6 +244,17 @@ async def remove_duplicated_subscription(_, message: Message):
     await message.reply_text(f'{count_removed} duplicated subscription(s) removed', quote=True)
 
 
+@app.on_message(filters.command('clear') & is_superuser)
+async def clear(_, message: Message):
+    await message.reply_text(
+        text=f'{worker.get_queue_size()} pending task(s) cancelled\n'
+             f'{len(worker.retry_tasks)} retry task(s) cancelled',
+        quote=True
+    )
+    await worker.clear_queue()
+    worker.retry_tasks.clear()
+
+
 @app.on_message(filters.command('set_download_max_size') & is_superuser)
 async def set_download_max_size(_, message: Message):
     size = get_args(message)
@@ -333,13 +333,13 @@ if __name__ == '__main__':
         BotCommand(command='check', description='check all videos whether they are still available'),
         BotCommand(command='retry', description='retry all videos in retry list'),
         BotCommand(command='stat', description='show statistics'),
-        BotCommand(command='clear', description='clear both retry and pending tasks'),
         BotCommand(command='add_list', description='add all videos in a playlist'),
         BotCommand(command='add_holoinfo', description='add 100 videos from holoinfo'),
         BotCommand(command='add_channel', description='all the videos uploaded by the channel'),
         BotCommand(command='add_subscription', description='add recent subscription feeds'),
         BotCommand(command='add_extra_subscription', description='add channel into separated subscription list'),
         BotCommand(command='remove_duplicated_subscription', description='remove duplicated subscription'),
+        BotCommand(command='clear', description='clear both retry and pending tasks'),
         BotCommand(command='set_download_max_size', description='set max size of downloading video'),
         BotCommand(command='toggle_reply_on_success', description='change success notification setting'),
         BotCommand(command='toggle_reply_on_failure', description='change failure notification setting'),
