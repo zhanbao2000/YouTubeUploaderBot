@@ -3,7 +3,6 @@ from textwrap import dedent
 
 from pyrogram import Client, filters, idle
 from pyrogram.types import BotCommand, Message
-
 from config import API_HASH, API_ID, BOT_TOKEN, CHAT_ID, DOWNLOAD_ROOT, PROXY_TELEGRAM
 from database import (
     delete_extra_subscription,
@@ -230,18 +229,33 @@ async def add_extra_subscription(_, message: Message):
         )
 
 
-@app.on_message(filters.command('remove_duplicated_subscription') & is_superuser)
-async def remove_duplicated_subscription(_, message: Message):
+@app.on_message(filters.command('remove_invalid_subscription') & is_superuser)
+async def remove_invalid_subscription(_, message: Message):
     channel_ids_extra_subscription = get_all_extra_subscription_channel_ids()
     channel_ids_my_subscription = await get_all_my_subscription_channel_ids()
 
-    count_removed = sum(
+    count_duplicated = sum(
         1
         for channel_id in channel_ids_extra_subscription
         if channel_id in channel_ids_my_subscription and delete_extra_subscription(channel_id)
     )
 
-    await message.reply_text(f'{count_removed} duplicated subscription(s) removed', quote=True)
+    playlist_ids = dict()  # channel_id -> playlist_id
+    for channel_ids in batched(channel_ids_extra_subscription, 50):
+        playlist_ids.update(await get_channel_uploads_playlist_id_batch(channel_ids))
+
+    # invalid subscriptions do not have a corresponding key (channel_id) in dict playlist_ids
+    count_banned = sum(
+        1
+        for channel_id in channel_ids_extra_subscription
+        if channel_id not in playlist_ids and delete_extra_subscription(channel_id)
+    )
+
+    await message.reply_text(
+        f'{count_duplicated} duplicated subscription(s) removed, '
+        f'{count_banned} banned subscription(s) removed',
+        quote=True
+    )
 
 
 @app.on_message(filters.command('clear') & is_superuser)
@@ -338,7 +352,7 @@ if __name__ == '__main__':
         BotCommand(command='add_channel', description='all the videos uploaded by the channel'),
         BotCommand(command='add_subscription', description='add recent subscription feeds'),
         BotCommand(command='add_extra_subscription', description='add channel into separated subscription list'),
-        BotCommand(command='remove_duplicated_subscription', description='remove duplicated subscription'),
+        BotCommand(command='remove_invalid_subscription', description='remove all duplicated and banned subscriptions'),
         BotCommand(command='clear', description='clear both retry and pending tasks'),
         BotCommand(command='set_download_max_size', description='set max size of downloading video'),
         BotCommand(command='toggle_reply_on_success', description='change success notification setting'),
