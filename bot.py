@@ -32,7 +32,6 @@ from utils import (
 from worker import SchedulerManager, VideoChecker, VideoWorker
 from youtube import (
     get_all_my_subscription_channel_ids,
-    get_all_stream_urls_from_holoinfo,
     get_all_video_urls_from_playlist,
     get_channel_id,
     get_channel_id_by_link,
@@ -142,21 +141,6 @@ async def add_list(_, message: Message):
 
     await message.reply_text(
         text=f'{count_urls} video(s) in this list\n'
-             f'{count_urls - count_urls_filtered} video(s) skipped\n'
-             f'{count_urls_filtered} task(s) added',
-        quote=True
-    )
-
-
-@app.on_message(filters.command('add_holoinfo') & is_superuser)
-async def add_holoinfo(_, message: Message):
-    video_urls = await get_all_stream_urls_from_holoinfo()
-    count_urls = len(video_urls)
-
-    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.id)
-
-    await message.reply_text(
-        text=f'{count_urls} video(s) fetched from holoinfo\n'
              f'{count_urls - count_urls_filtered} video(s) skipped\n'
              f'{count_urls_filtered} task(s) added',
         quote=True
@@ -348,7 +332,6 @@ if __name__ == '__main__':
         BotCommand(command='retry', description='retry all videos in retry list'),
         BotCommand(command='stat', description='show statistics'),
         BotCommand(command='add_list', description='add all videos in a playlist'),
-        BotCommand(command='add_holoinfo', description='add 100 videos from holoinfo'),
         BotCommand(command='add_channel', description='all the videos uploaded by the channel'),
         BotCommand(command='add_subscription', description='add recent subscription feeds'),
         BotCommand(command='add_extra_subscription', description='add channel into separated subscription list'),

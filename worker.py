@@ -57,7 +57,6 @@ from utils import (
 from youtube import (
     DownloadManager,
     get_all_my_subscription_channel_ids,
-    get_all_stream_urls_from_holoinfo,
     get_all_video_urls_from_playlist,
     get_channel_uploads_playlist_id_batch,
     get_thumbnail,
@@ -561,7 +560,6 @@ class SchedulerManager(object):
 
         beijing_tz = timezone('Asia/Shanghai')
 
-        self.scheduler.add_job(self.add_holoinfo, 'cron', hour='3', timezone=beijing_tz)
         self.scheduler.add_job(self.add_subscription, 'cron', hour='3', timezone=beijing_tz)
         self.scheduler.add_job(self.retry, 'cron', hour='6,9,12', timezone=beijing_tz)
 
@@ -605,11 +603,6 @@ class SchedulerManager(object):
             for playlist_id in playlist_ids.values():
                 video_urls.extend(await get_all_video_urls_from_playlist(playlist_id, 'ASMR', 5))
 
-        await self.worker.add_task_batch(video_urls, None, None)
-
-    async def add_holoinfo(self) -> None:
-        """add 100 videos from holoinfo"""
-        video_urls = await get_all_stream_urls_from_holoinfo()
         await self.worker.add_task_batch(video_urls, None, None)
 
     async def retry(self) -> None:

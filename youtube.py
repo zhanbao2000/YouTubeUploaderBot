@@ -13,7 +13,7 @@ from model.playlistItems import PlaylistItems
 from model.subscriptions import Subscriptions
 from model.videos import Videos
 from typedef import IncompleteTranscodingError, VideoStatus, VideoTooShortError
-from utils import create_video_link, format_date, format_file_size, get_client, get_proxy_yt_dlp
+from utils import format_date, format_file_size, get_client, get_proxy_yt_dlp
 
 
 class Format(object):
@@ -433,29 +433,6 @@ async def get_channel_uploads_playlist_id_batch(channel_ids: list[str]) -> dict[
         channel.id: channel.contentDetails.relatedPlaylists.uploads
         for channel in channels.items
     }
-
-
-async def get_all_stream_urls_from_holoinfo(limit: int = 100, max_upcoming_hours: int = -1) -> list[str]:
-    """get all video urls from holoinfo"""
-    params = {
-        'status': 'past',
-        'type': 'stream',
-        'topic': 'asmr',
-        'limit': limit,
-        'max_upcoming_hours': max_upcoming_hours,
-    }
-    headers = {
-        'User-Agent': 'YouTubeUploaderBot/1.0 (contact: https://github.com/zhanbao2000/YouTubeUploaderBot)',
-        'Sec-Fetch-Site': 'same-origin'
-    }
-
-    async with get_client() as client:
-        resp = await client.get('https://holoinfo.me/dex/videos', headers=headers, params=params)
-
-        if resp.status_code != 200:
-            return []
-
-    return [create_video_link(video_info['id']) for video_info in resp.json()]
 
 
 async def get_channel_id_by_link(url: str) -> Optional[str]:
