@@ -117,10 +117,6 @@ class VideoWorker(object):
         """return pending tasks = waiting + current"""
         return self.video_queue.qsize() + self.is_working
 
-    def get_queue_size(self) -> int:
-        """return waiting tasks = queue size"""
-        return self.video_queue.qsize()
-
     async def add_task(self, url: str, chat_id: Optional[int], message_id: Optional[int]) -> AddResult:
         """add a new task, skip if the task already exists in any of the queues or the database to avoid duplication"""
         video_id = get_video_id(url)
@@ -211,8 +207,8 @@ class VideoWorker(object):
 
     async def reply_task_done(self) -> None:
         """inform the user that this task had been done"""
-        if self.get_queue_size():
-            await self.reply_success(f'task finished\npending task(s): {self.get_queue_size()}')
+        if (qsize := self.video_queue.qsize()) > 0:
+            await self.reply_success(f'task finished\npending task(s): {qsize}')
         else:
             await self.reply_success('all tasks finished')
 

@@ -245,7 +245,7 @@ async def remove_invalid_subscription(_, message: Message):
 @app.on_message(filters.command('clear') & is_superuser)
 async def clear(_, message: Message):
     await message.reply_text(
-        text=f'{worker.get_queue_size()} pending task(s) cancelled\n'
+        text=f'{worker.video_queue.qsize()} pending task(s) cancelled\n'
              f'{len(worker.retry_tasks)} retry task(s) cancelled',
         quote=True
     )
