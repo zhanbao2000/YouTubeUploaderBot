@@ -183,7 +183,7 @@ def remove_hashtags_from_caption(caption: str) -> str:
     return caption
 
 
-def find_channel_in_message(message: Message) -> Channel:
+def find_channel_in_message(message: Message) -> Optional[Channel]:
     """find channel name and URL in a message"""
     # do NOT use str.find() because some of the characters in message.caption may be emojis (UTF-16-LE), which have a length more than 1
     match = search(r'\n频道：(.*?)\n时长', message.caption)
