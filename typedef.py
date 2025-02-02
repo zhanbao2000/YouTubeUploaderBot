@@ -18,8 +18,6 @@ class VideoTooShortError(RuntimeError):
 class UniqueQueue(Queue):
     """A queue that ensures all items are unique (set-like). It supports the `in` operator to check for item existence."""
 
-    # use 'noqa' to ignore the warning of calling protected member
-
     def __init__(self, maxsize=0):
         super().__init__(maxsize)
         self._set = set()
@@ -29,22 +27,22 @@ class UniqueQueue(Queue):
 
     def _put(self, item):
         if item not in self._set:
-            super()._put(item)  # noqa
+            super()._put(item)
             self._set.add(item)
 
     def _get(self):
-        item = super()._get()  # noqa
+        item = super()._get()
         self._set.remove(item)
         return item
 
     def put_left_nowait(self, item):
         """Put an item into the front of the queue."""
         if item not in self._set:
-            self._queue.appendleft(item)  # noqa
+            self._queue.appendleft(item)
             self._set.add(item)
-            self._unfinished_tasks += 1  # noqa
-            self._finished.clear()  # noqa
-            self._wakeup_next(self._getters)  # noqa
+            self._unfinished_tasks += 1
+            self._finished.clear()
+            self._wakeup_next(self._getters)
 
 
 class Channel(NamedTuple):
