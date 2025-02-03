@@ -3,6 +3,7 @@ from textwrap import dedent
 
 from pyrogram import Client, filters, idle
 from pyrogram.types import BotCommand, Message
+
 from config import API_HASH, API_ID, BOT_TOKEN, CHAT_ID, DOWNLOAD_ROOT, PROXY_TELEGRAM
 from database import (
     delete_extra_subscription,
@@ -28,6 +29,7 @@ from utils import (
     get_uptime,
     is_ready,
     is_superuser,
+    kill_self,
 )
 from worker import SchedulerManager, VideoChecker, VideoWorker
 from youtube import (
@@ -352,4 +354,6 @@ if __name__ == '__main__':
     scheduler_manager = SchedulerManager(worker, app)
 
     idle()
+
     app.stop(block=False)
+    kill_self()  # if a download is in progress (by yt-dlp), CTRL+C will not stop the program, so we need to kill self manually

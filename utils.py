@@ -1,6 +1,6 @@
 from collections import deque
 from datetime import datetime
-from os import getpid
+from os import getpid, kill
 from platform import system
 from random import choice
 from re import search, sub
@@ -267,6 +267,11 @@ def join_list(separator: list[T], *lists: list[T]) -> Generator[T, None, None]:
         yield from lst
         if index != length:  # do not add separator after the last list
             yield from separator
+
+
+def kill_self() -> None:
+    """kill the bot process"""
+    kill(getpid(), 9)
 
 
 is_superuser = filters.chat(SUPERUSERS)
