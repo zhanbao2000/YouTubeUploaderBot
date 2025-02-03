@@ -334,9 +334,9 @@ class VideoWorker(object):
         msg = remove_color_codes(e.msg)
 
         if not any((
-            await self.on_error_members_only_videos(dm, e),
-            await self.on_error_should_use_cookies(dm, e),
-            await self.on_error_should_retry(dm, e)
+                await self.on_error_members_only_videos(dm, e),
+                await self.on_error_should_use_cookies(dm, e),
+                await self.on_error_should_retry(dm, e)
         )):
             await self.reply_failure(f'error on downloading this video: '
                                      f'{create_video_link_markdown(dm.video_id)}\n{msg}')
