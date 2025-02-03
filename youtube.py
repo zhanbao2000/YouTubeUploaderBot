@@ -336,7 +336,7 @@ async def get_all_video_urls_from_playlist(playlist_id: str, filter_str: str = '
             for playlist_item in playlist_items.items:
                 video_id = playlist_item.snippet.resourceId.videoId
 
-                if filter_str in playlist_item.snippet.title:
+                if filter_str.lower() in playlist_item.snippet.title.lower():
                     result.append(f'https://www.youtube.com/watch?v={video_id}')
 
                 if limit and len(result) >= limit:
