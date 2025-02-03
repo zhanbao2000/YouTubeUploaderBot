@@ -1,4 +1,4 @@
-from asyncio import Queue
+from asyncio import Queue, QueueFull
 from enum import Enum
 from typing import NamedTuple, Optional
 
@@ -37,6 +37,8 @@ class UniqueQueue(Queue):
 
     def put_left_nowait(self, item):
         """Put an item into the front of the queue."""
+        if self.full():
+            raise QueueFull
         if item not in self._set:
             self._queue.appendleft(item)
             self._set.add(item)
