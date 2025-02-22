@@ -336,6 +336,17 @@ class VideoWorker(object):
 
         return False
 
+    async def on_error_unavailable_live_stream_recording(self, dm: DownloadManager, e: YoutubeDLError) -> bool:
+        """handle error of: This live stream recording is not available"""
+        msg = remove_color_codes(e.msg)
+
+        if 'This live stream recording is not available' in msg:
+            insert_video(dm.video_id, 0, 0, {}, VideoStatus.UNAVAILABLE_RECORD)
+            await self.reply_failure(f'This live stream recording is not available: {create_video_link_markdown(dm.video_id)}\n')
+            return True
+
+        return False
+
     async def on_download_error(self, dm: DownloadManager, e: YoutubeDLError) -> None:
         """handle error of YoutubeDLError"""
         msg = remove_color_codes(e.msg)
@@ -343,7 +354,8 @@ class VideoWorker(object):
         if not any((
                 await self.on_error_members_only_videos(dm, e),
                 await self.on_error_should_use_cookies(dm, e),
-                await self.on_error_should_retry(dm, e)
+                await self.on_error_should_retry(dm, e),
+                await self.on_error_unavailable_live_stream_recording(dm, e),
         )):
             await self.reply_failure(f'error on downloading this video: '
                                      f'{create_video_link_markdown(dm.video_id)}\n{msg}')

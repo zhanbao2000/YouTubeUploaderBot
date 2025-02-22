@@ -97,6 +97,7 @@ class RetryReason(str, Enum):
 
 class VideoStatus(int, Enum):
     # positive values are available or can be made available
+    UNAVAILABLE_RECORD = 4
     MEMBERS_ONLY = 3
     TOO_SHORT = 2
     AVAILABLE = 1
