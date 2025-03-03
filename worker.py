@@ -127,6 +127,7 @@ class VideoWorker(object):
     async def add_task(self, url: str, chat_id: Optional[int], message_id: Optional[int], left: bool = False) -> AddResult:
         """add a new task, skip if the task already exists in any of the queues or the database to avoid duplication"""
         video_id = get_video_id(url)
+        url = create_video_link(video_id)  # re-make URL to differ different URLs that actually refer to the same video_id
 
         if is_in_database(video_id):
             # There is no need to get the video_message_id every time when the video_id already exists in the database.
