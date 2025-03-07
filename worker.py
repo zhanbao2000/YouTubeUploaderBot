@@ -579,7 +579,7 @@ class SchedulerManager(object):
         beijing_tz = timezone('Asia/Shanghai')
 
         self.scheduler.add_job(self.add_subscription, 'cron', hour='3', timezone=beijing_tz)
-        self.scheduler.add_job(self.retry, 'cron', hour='6,9,12', timezone=beijing_tz)
+        self.scheduler.add_job(self.retry, 'cron', hour='6,9,12,18', timezone=beijing_tz)
 
         self.scheduler.add_listener(self.on_error, EVENT_JOB_ERROR)
         self.scheduler.start()
