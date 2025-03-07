@@ -124,6 +124,14 @@ def format_duration(duration: int) -> str:
         return f'{seconds}秒'
 
 
+def format_duration_without_unit(duration: int) -> str:
+    """convert duration to human-readable format without unit, the max unit is hour"""
+    hours, duration = divmod(duration, 60 * 60)
+    minutes, seconds = divmod(duration, 60)
+
+    return f'{hours:02d}:{minutes:02d}:{seconds:02d}'
+
+
 def format_timestamp(timestamp: float) -> str:
     """convert timestamp to human-readable format：2020-02-20 11:45:14"""
     return strftime('%Y-%m-%d %H:%M:%S', localtime(timestamp))

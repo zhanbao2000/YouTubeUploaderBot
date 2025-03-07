@@ -58,6 +58,7 @@ from youtube import (
     DownloadManager,
     get_all_my_subscription_channel_ids,
     get_all_video_urls_from_playlist,
+    get_captures,
     get_channel_uploads_playlist_id_batch,
     get_thumbnail,
     get_video_caption,
@@ -237,22 +238,23 @@ class VideoWorker(object):
         return video_info
 
     async def upload_video(self, file: Path, video_info: dict) -> Message:
-        """upload the video and its thumbnail, return the message of the thumbnail"""
+        """upload the video with its thumbnail, and its captures, return the message of the captures"""
         with open(file, 'rb') as video:
             video_message = await self.app.send_video(
                 chat_id=CHAT_ID, video=video, file_name=file.name,
                 supports_streaming=True, duration=video_info['duration'],
-                width=video_info['width'], height=video_info['height']
+                width=video_info['width'], height=video_info['height'],
+                thumb=await get_thumbnail(video_info['thumbnail'])
             )
-            thumbnail_message = await self.app.send_photo(
-                chat_id=CHAT_ID, photo=await get_thumbnail(video_info['thumbnail']),
+            captures_message = await self.app.send_photo(
+                chat_id=CHAT_ID, photo=get_captures(file, video_info),
                 caption=get_video_caption(video_info), reply_to_message_id=video_message.id
             )
 
             self.session_uploaded_files += 1
             self.session_uploaded_size += file.stat().st_size
 
-            return thumbnail_message
+            return captures_message
 
     async def on_too_short_video(self, dm: DownloadManager, e: VideoTooShortError) -> None:
         """handle error of VideoTooShortError"""

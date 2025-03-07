@@ -1,9 +1,11 @@
 import re
 from io import BytesIO
 from pathlib import Path
+from subprocess import run, DEVNULL
 from time import time
 from typing import Optional
 
+from PIL import Image, ImageDraw, ImageFont
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import YoutubeDLError
 
@@ -13,7 +15,7 @@ from model.playlistItems import PlaylistItems
 from model.subscriptions import Subscriptions
 from model.videos import Videos
 from typedef import IncompleteTranscodingError, VideoStatus, VideoTooShortError
-from utils import format_date, format_file_size, get_client, get_proxy_yt_dlp
+from utils import format_date, format_duration_without_unit, format_file_size, get_client, get_proxy_yt_dlp
 
 
 class Format(object):
@@ -280,6 +282,54 @@ async def get_thumbnail(url: str) -> BytesIO:
     async with get_client() as client:
         r = await client.get(url)
         return BytesIO(r.content)
+
+
+def get_captures(video: Path, video_info: dict) -> BytesIO:
+    """generate video captures (4x3) from video file"""
+    temp_path = Path(DOWNLOAD_ROOT)
+
+    interval = video_info['duration'] / 13
+    ratio = video_info['width'] / video_info['height']
+    target_frame_size = (480, int(480 / ratio))  # single frame size
+    grid_width = target_frame_size[0] * 4  # final grid width
+    grid_height = target_frame_size[1] * 3  # final grid height
+    grid_image = Image.new('RGB', (grid_width, grid_height))
+    font = ImageFont.load_default(size=40)
+    result = BytesIO()
+
+    for index in range(12):
+        # generate frames
+        time_position = int((index + 1) * interval)
+        timestamp = format_duration_without_unit(time_position)
+        output_file = temp_path / f'frame_{index:02d}.png'
+
+        run([
+            'bin/ffmpeg',
+            '-ss', str(time_position),
+            '-i', str(video),
+            '-vframes', '1',
+            '-q:v', '2',
+            '-y',
+            str(output_file)
+        ], check=True, stdout=DEVNULL, stderr=DEVNULL)
+
+        # paste resized frame to grid image
+        image = Image.open(output_file).resize(target_frame_size)
+
+        draw = ImageDraw.Draw(image)
+        draw.text((8, 5), timestamp, fill=(255, 255, 255, 255), font=font, stroke_width=1, stroke_fill=(0, 0, 0, 255))
+
+        row, col = index // 4, index % 4
+        x = col * target_frame_size[0]
+        y = row * target_frame_size[1]
+        grid_image.paste(image, (x, y))
+
+    grid_image.save(result, format='PNG')
+
+    for file in temp_path.glob('frame_*.png'):
+        file.unlink(missing_ok=True)
+
+    return result
 
 
 async def is_video_available_online(video_id: str) -> bool:
