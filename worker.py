@@ -240,7 +240,7 @@ class VideoWorker(object):
         """upload the video and its thumbnail, return the message of the thumbnail"""
         with open(file, 'rb') as video:
             video_message = await self.app.send_video(
-                chat_id=CHAT_ID, video=video,
+                chat_id=CHAT_ID, video=video, file_name=file.name,
                 supports_streaming=True, duration=video_info['duration'],
                 width=video_info['width'], height=video_info['height']
             )
