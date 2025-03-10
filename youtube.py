@@ -281,7 +281,26 @@ async def get_thumbnail(url: str) -> BytesIO:
     """download thumbnail of a video, as BytesIO object"""
     async with get_client() as client:
         r = await client.get(url)
-        return BytesIO(r.content)
+        data = BytesIO(r.content)
+
+    if url.endswith('.jpg'):
+        return data
+
+    # else, it is a webp image or other format
+
+    image = Image.open(data)
+
+    if image.mode in ('RGBA', 'LA'):
+        background = Image.new('RGB', image.size, (255, 255, 255))
+        background.paste(image, mask=image.split()[3] if image.mode == 'RGBA' else image.split()[1])
+        image = background
+    elif image.mode != 'RGB':
+        image = image.convert('RGB')
+
+    jpeg_data = BytesIO()
+    image.save(jpeg_data, 'JPEG', quality=90)
+
+    return jpeg_data
 
 
 def get_captures(video: Path, video_info: dict) -> BytesIO:
