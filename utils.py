@@ -201,6 +201,10 @@ def find_channel_in_message(message: Message) -> Optional[Channel]:
         if text == match.group(1) and entity.type is MessageEntityType.TEXT_LINK:
             return Channel(text, entity.url)
 
+    # case: if the channel name in this message is a plain text and does not refer to a URL
+    # then: we return YouTube homepage as its channel_url since its original URL is completely unknown
+    return Channel(match.group(1), 'https://www.youtube.com/')
+
 
 def get_next_retry_ts(error_message: str) -> float:
     """get next retry timestamp from error message"""
