@@ -1,5 +1,6 @@
 from asyncio import Queue, QueueFull
 from enum import Enum
+from time import time
 from typing import NamedTuple, Optional
 
 from yt_dlp.utils import YoutubeDLError
@@ -45,6 +46,94 @@ class UniqueQueue(Queue):
             self._unfinished_tasks += 1
             self._finished.clear()
             self._wakeup_next(self._getters)
+
+
+class ProgressStatus(object):
+    """A super class to collect progress information"""
+
+    def __init__(self):
+        self.in_progress = False
+        self.finished = False
+        self.transferred = 0
+        self.total = 0
+        self.start_ts = 0.
+
+    def update(self, *args, **kwargs) -> None:
+        if self.start_ts == 0.:
+            self.start_ts = time()
+
+    def get_percentage(self) -> float:
+        return self.transferred / self.total * 100 if self.total else 0.
+
+    def get_elapsed(self) -> float:
+        return time() - self.start_ts if self.start_ts else 0.
+
+    def get_avg_speed(self) -> float:
+        return self.transferred / self.get_elapsed() if self.get_elapsed() else 0.
+
+    def get_avg_speed_formatted(self) -> str:
+        bytes_per_second = self.get_avg_speed()
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if bytes_per_second < 1024:
+                result = f'{bytes_per_second:.1f} {unit}'
+                break
+            bytes_per_second /= 1024
+        else:
+            result = f'{bytes_per_second:.1f} PB'
+        return f'{result}/s'
+
+    def get_eta(self) -> str:
+        remain_bytes = self.total - self.transferred
+        speed = self.get_avg_speed()
+
+        if speed == 0.:
+            return 'N/A'
+
+        remain_seconds = int(remain_bytes / speed)
+        days, remain_seconds = divmod(remain_seconds, 60 * 60 * 24)
+        hours, remain_seconds = divmod(remain_seconds, 60 * 60)
+        minutes, seconds = divmod(remain_seconds, 60)
+
+        if days > 0:
+            return f'{days}d{hours}h{minutes}m{seconds}s'
+        elif hours > 0:
+            return f'{hours}h{minutes}m{seconds}s'
+        elif minutes > 0:
+            return f'{minutes}m{seconds}s'
+        else:
+            return f'{seconds}s'
+
+
+class DownloadProgressStatus(ProgressStatus):
+    """A class to collect download progress information from yt-dlp"""
+
+    def __init__(self):
+        super().__init__()
+        self.title = 'Unknown'
+
+    def update(self, video_info: dict) -> None:
+        super().update()
+        if video_info['status'] == 'downloading':
+            self.in_progress = True
+            self.transferred = video_info.get('downloaded_bytes', 0)
+            self.total = video_info.get('total_bytes', 0) or video_info.get('total_bytes_estimate', 0)
+            self.title = video_info.get('info_dict', {}).get('title', '')
+        else:
+            self.in_progress = False
+            self.finished = True
+
+
+class UploadProgressStatus(ProgressStatus):
+    """A class to collect upload progress information from pyrogram"""
+
+    def update(self, transferred: int, total: int) -> None:
+        super().update()
+        self.in_progress = True
+        self.transferred = transferred
+        self.total = total
+        if transferred == total:
+            self.in_progress = False
+            self.finished = True
 
 
 class Channel(NamedTuple):

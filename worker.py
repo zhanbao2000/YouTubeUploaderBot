@@ -28,11 +28,13 @@ from database import (
 from typedef import (
     AddResult,
     Channel,
+    DownloadProgressStatus,
     HashTag,
     IncompleteTranscodingError,
     RetryReason,
     Task,
     UniqueQueue,
+    UploadProgressStatus,
     VideoStatus,
     VideoTooShortError,
 )
@@ -74,6 +76,8 @@ class VideoWorker(object):
 
         self.video_queue: UniqueQueue[Task] = UniqueQueue()
         self.current_task: Optional[Task] = None
+        self.download_progress_status: Optional[DownloadProgressStatus] = None
+        self.upload_progress_status: Optional[UploadProgressStatus] = None
         self.retry_tasks: dict[str, float] = dict()  # save the urls of the task that need to be retried and the timestamps of their next retries
 
         self.session_uploaded_files = 0  # total number of files that have been uploaded since startup
@@ -237,7 +241,7 @@ class VideoWorker(object):
 
         return video_info
 
-    async def upload_video(self, file: Path, video_info: dict) -> Message:
+    async def upload_video(self, file: Path, video_info: dict, progress_hook: callable = None) -> Message:
         """upload the video with its thumbnail, and its captures, return the message of the captures"""
         with open(file, 'rb') as video:
             width, height = video_info['width'], video_info['height']
@@ -245,7 +249,8 @@ class VideoWorker(object):
                 chat_id=CHAT_ID, video=video, file_name=file.name,
                 supports_streaming=True, duration=video_info['duration'],
                 width=width, height=height,
-                thumb=await get_thumbnail(video_info['thumbnail'], width, height)
+                thumb=await get_thumbnail(video_info['thumbnail'], width, height),
+                progress=progress_hook
             )
             captures_message = await self.app.send_photo(
                 chat_id=CHAT_ID, photo=get_captures(file, video_info),
@@ -256,6 +261,41 @@ class VideoWorker(object):
             self.session_uploaded_size += file.stat().st_size
 
             return captures_message
+
+    def generate_current_task_status(self) -> str:
+        """generate a status message for the current task"""
+        if self.is_working is False:
+            return 'idle'
+
+        ds = self.download_progress_status
+        us = self.upload_progress_status
+
+        video_id = get_video_id(self.current_task.url)
+        if ds.title == 'Unknown':
+            video_link_markdown = create_video_link_markdown(video_id)
+        else:
+            video_link_markdown = create_video_link_markdown(video_id, ds.title)
+        message1 = f'video: {video_link_markdown}'
+
+        if ds.in_progress is False and ds.finished is False:
+            message2 = 'waiting for yt-dlp to get video info ...'
+        elif ds.in_progress is True:
+            message2 = (f'downloading: {format_file_size(ds.transferred)}/{format_file_size(ds.total)} '
+                        f'({ds.get_percentage():.1f}%) '
+                        f'{ds.get_avg_speed_formatted()} ETA {ds.get_eta()}')
+        elif ds.finished is True and us.in_progress is False and us.finished is False:
+            message2 = 'merging video and audio ...'
+        elif us.in_progress is True:
+            message2 = (f'uploading: {format_file_size(us.transferred)}/{format_file_size(us.total)} '
+                        f'({us.get_percentage():.1f}%) '
+                        f'{us.get_avg_speed_formatted()} ETA {us.get_eta()}')
+        elif us.finished is True:
+            message2 = 'generating captures ...'
+        else:
+            message2 = 'Error'
+
+        return (f'{message1}\n'
+                f'               {message2}')  # the second message should be started with spaces to align with the first message
 
     async def on_too_short_video(self, dm: DownloadManager, e: VideoTooShortError) -> None:
         """handle error of VideoTooShortError"""
@@ -377,13 +417,17 @@ class VideoWorker(object):
 
         await self.clear_download_folder()
         self.is_working = False
+        self.download_progress_status = None
+        self.upload_progress_status = None
         self.video_queue.task_done()
 
     async def work(self) -> None:
         """main work loop"""
         while True:
+            self.download_progress_status = DownloadProgressStatus()
+            self.upload_progress_status = UploadProgressStatus()
             self.current_task = await self.video_queue.get()
-            dm = DownloadManager(self.current_task.url)
+            dm = DownloadManager(self.current_task.url, [self.download_progress_status.update])
 
             self.is_working = True
             # determine whether the download or upload is successful by setting its initial value to None,
@@ -393,7 +437,7 @@ class VideoWorker(object):
 
             try:
                 video_info = await self.download_video(dm, self.current_task.use_cookies)
-                thumbnail_message = await self.upload_video(dm.file, video_info)
+                thumbnail_message = await self.upload_video(dm.file, video_info, self.upload_progress_status.update)
 
             except VideoTooShortError as e:
                 await self.on_too_short_video(dm, e)

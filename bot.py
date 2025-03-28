@@ -99,6 +99,9 @@ async def stat(_, message: Message):
                pending tasks: {worker.get_pending_tasks_count()}
                retry list size: {len(worker.retry_tasks)}
                retry ready: {sum(is_ready(next_retry_ts) for next_retry_ts in worker.retry_tasks.values())}
+               
+             current task
+               {worker.generate_current_task_status()}
 
              video count
                backup videos count: {get_backup_videos_count()}
@@ -126,7 +129,8 @@ async def stat(_, message: Message):
                Data: {format_file_size(memory_usage.data)}
                Dirty: {format_file_size(memory_usage.dirty)}
                Swap: {format_file_size(get_swap_usage())}'''),
-        quote=True
+        quote=True,
+        disable_web_page_preview=True
     )
 
 

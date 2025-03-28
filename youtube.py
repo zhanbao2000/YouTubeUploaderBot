@@ -60,8 +60,9 @@ class AudioFormat(Format):
 
 class DownloadManager(object):
 
-    def __init__(self, url: str):
+    def __init__(self, url: str, progress_hooks: list[callable] = None):
         self.url = url
+        self.progress_hooks = progress_hooks
         self.video_id = get_video_id(url)
         self.file = Path(f'{DOWNLOAD_ROOT}/{self.video_id}.mp4')
 
@@ -77,7 +78,8 @@ class DownloadManager(object):
             'concurrent_fragment_downloads': 16,
             'outtmpl': str(self.file),
             'skip_download': True,
-            'socket_timeout': 90
+            'socket_timeout': 90,
+            'progress_hooks': self.progress_hooks,
         }
 
     def _get_ydl_options_with_cookies(self) -> dict:
