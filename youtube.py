@@ -277,16 +277,11 @@ def get_formats_list(formats: list[dict]) -> tuple[list[VideoFormat], list[Audio
     )
 
 
-async def get_thumbnail(url: str) -> BytesIO:
-    """download thumbnail of a video, as BytesIO object"""
+async def get_thumbnail(url: str, width: int, height: int) -> BytesIO:
+    """download thumbnail of a video, as BytesIO object, convert it to video size"""
     async with get_client() as client:
         r = await client.get(url)
         data = BytesIO(r.content)
-
-    if url.endswith('.jpg'):
-        return data
-
-    # else, it is a webp image or other format
 
     image = Image.open(data)
 
@@ -296,9 +291,35 @@ async def get_thumbnail(url: str) -> BytesIO:
         image = background
     elif image.mode != 'RGB':
         image = image.convert('RGB')
+    # else it is a jpg image, we don't need to convert it
+
+    # STEP 1: crop the image to remove black borders, use 5 as threshold
+    gray_image = image.convert('L')
+    mask = gray_image.point(lambda x: 255 if x > 5 else 0)
+    bbox = mask.getbbox()
+    if bbox:
+        image = image.crop(bbox)
+
+    # STEP 2: resize the origin image to fit the video width or height
+    img_ratio = image.width / image.height
+    target_ratio = width / height
+
+    if img_ratio > target_ratio:
+        new_width = width
+        new_height = int(width / img_ratio)
+    else:
+        new_height = height
+        new_width = int(height * img_ratio)
+
+    # STEP 3: paste the resized image a black background with the same size as the video
+    image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+    offset_x = (width - new_width) // 2
+    offset_y = (height - new_height) // 2
+    target_image = Image.new('RGB', (width, height), (0, 0, 0))  # black background
+    target_image.paste(image, (offset_x, offset_y))
 
     jpeg_data = BytesIO()
-    image.save(jpeg_data, 'JPEG', quality=90)
+    target_image.save(jpeg_data, 'JPEG', quality=90)
 
     return jpeg_data
 

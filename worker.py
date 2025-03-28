@@ -240,11 +240,12 @@ class VideoWorker(object):
     async def upload_video(self, file: Path, video_info: dict) -> Message:
         """upload the video with its thumbnail, and its captures, return the message of the captures"""
         with open(file, 'rb') as video:
+            width, height = video_info['width'], video_info['height']
             video_message = await self.app.send_video(
                 chat_id=CHAT_ID, video=video, file_name=file.name,
                 supports_streaming=True, duration=video_info['duration'],
-                width=video_info['width'], height=video_info['height'],
-                thumb=await get_thumbnail(video_info['thumbnail'])
+                width=width, height=height,
+                thumb=await get_thumbnail(video_info['thumbnail'], width, height)
             )
             captures_message = await self.app.send_photo(
                 chat_id=CHAT_ID, photo=get_captures(file, video_info),
