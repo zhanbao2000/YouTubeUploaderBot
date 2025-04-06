@@ -21,7 +21,7 @@ from utils import format_date, format_duration_without_unit, format_file_size, g
 class Format(object):
 
     def __init__(self, format_info: dict):
-        self.format_id: int = int(format_info.get('format_id'))
+        self.format_id: str = format_info.get('format_id')
         self.format_note: str = format_info.get('format_note')
         self.filesize: int = format_info.get('filesize') or format_info.get('filesize_approx') or 0
         self.bitrate: float = format_info.get('vbr') or format_info.get('tbr') or format_info.get('abr') or 0
@@ -124,7 +124,7 @@ class DownloadManager(object):
         ydl_options = self._get_base_ydl_options()
         ydl_options.update({
             'format': 'bv+ba/b',
-            'format_sort': ['size:2000M'],
+            'format_sort': ['lang', 'size:2000M'],
             'merge_output_format': 'mp4',
         })
 
@@ -173,7 +173,7 @@ class DownloadManager(object):
 
         ydl_options.update({
             'format': 'bv+ba/b',
-            'format_sort': [f'size:{max_size_mb or 1}M'],  # at least 1 MB
+            'format_sort': ['lang', f'size:{max_size_mb or 1}M'],  # at least 1 MB
             'merge_output_format': 'mp4',
         })
 
@@ -269,7 +269,7 @@ def get_formats_list(formats: list[dict]) -> tuple[list[VideoFormat], list[Audio
     video_formats = []
 
     for format_info in formats:
-        if not format_info.get('format_id').isdigit():  # storyboards
+        if format_info.get('format_note') == 'storyboard':
             continue
         if 'video_ext' in format_info and format_info['video_ext'] != 'none' and 'format_note' in format_info:
             video_formats.append(VideoFormat(format_info))
