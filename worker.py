@@ -240,7 +240,7 @@ class VideoWorker(object):
             await self.reply_failure(f'{create_video_link_markdown(dm.video_id)}\n'
                                      f'file too big: {format_file_size(filesize)}\n'
                                      f'try downloading smaller format')
-            video_info = await to_thread(dm.download_max_size, 1600, use_cookies)  # retry with smaller format
+            video_info = await to_thread(dm.download_max_size, int(self.session_download_max_size * 0.8), use_cookies)  # retry with smaller format
             # if this format is still too big, the video_id will be recorded in db with message_id = 0
 
         return video_info
