@@ -62,7 +62,9 @@ class DownloadManager(object):
 
     def __init__(self, url: str, progress_hooks: list[callable] = None):
         self.url = url
-        self.progress_hooks = progress_hooks
+        # the default value of progress_hooks passed to yt-dlp is []
+        # however, we need to use this trick to avoid issues with mutable default parameters
+        self.progress_hooks = progress_hooks or []
         self.video_id = get_video_id(url)
         self.file = Path(f'{DOWNLOAD_ROOT}/{self.video_id}.mp4')
 
