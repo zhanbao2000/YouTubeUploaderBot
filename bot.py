@@ -14,13 +14,16 @@ from database import (
     get_extra_subscriptions_count,
     get_unavailable_videos_count,
     get_upload_message_id,
+    insert_blocklist,
     insert_extra_subscription,
+    is_in_blocklist,
 )
 from typedef import AddResult
 from utils import (
     batched,
     counter,
     create_message_link,
+    create_video_link_markdown,
     format_duration,
     format_file_size,
     get_args,
@@ -30,6 +33,7 @@ from utils import (
     is_ready,
     is_superuser,
     kill_self,
+    not_a_command,
 )
 from worker import SchedulerManager, VideoChecker, VideoWorker
 from youtube import (
@@ -219,6 +223,23 @@ async def add_extra_subscription(_, message: Message):
         )
 
 
+@app.on_message(filters.command('add_blocklist') & is_superuser)
+async def add_blocklist(_, message: Message):
+    url = get_args(message)
+    if not (video_id := get_video_id(url)):
+        return
+
+    if is_in_blocklist(video_id):
+        await message.reply_text('this video is already in the blocklist', quote=True)
+        return
+
+    insert_blocklist(video_id)
+    await message.reply_text(
+        f'successfully added to blocklist: {create_video_link_markdown(video_id)}',
+        quote=True
+    )
+
+
 @app.on_message(filters.command('remove_invalid_subscription') & is_superuser)
 async def remove_invalid_subscription(_, message: Message):
     channel_ids_extra_subscription = get_all_extra_subscription_channel_ids()
@@ -305,7 +326,7 @@ async def toggle_scheduler(_, message: Message):
         await message.reply_text('scheduler resumed', quote=True)
 
 
-@app.on_message(filters.regex(r'(?:youtube\.com/(?:watch\?v=|live/)|youtu\.be/)([0-9A-Za-z_-]{11})') & is_superuser)
+@app.on_message(not_a_command & filters.regex(r'(?:youtube\.com/(?:watch\?v=|live/)|youtu\.be/)([0-9A-Za-z_-]{11})') & is_superuser)
 async def youtube_url_regex(_, message: Message):
     url = str(message.text)
     add_result = await worker.add_task(url, message.chat.id, message.id)
@@ -323,6 +344,8 @@ async def youtube_url_regex(_, message: Message):
         reply = 'this video is already in the retry list, but not ready to retry'
     elif add_result is AddResult.DUPLICATE_CURRENT:
         reply = 'this video is currently being processed'
+    elif add_result is AddResult.BLOCKLIST:
+        reply = 'this video has been blocked by bot admin for some reasons'
     else:
         reply = f'unknown add result {add_result}'
 
@@ -341,6 +364,7 @@ if __name__ == '__main__':
         BotCommand(command='add_channel', description='all the videos uploaded by the channel'),
         BotCommand(command='add_subscription', description='add recent subscription feeds'),
         BotCommand(command='add_extra_subscription', description='add channel into separated subscription list'),
+        BotCommand(command='add_blocklist', description='add video into blocklist'),
         BotCommand(command='remove_invalid_subscription', description='remove all duplicated and banned subscriptions'),
         BotCommand(command='clear', description='clear both retry and pending tasks'),
         BotCommand(command='set_download_max_size', description='set max size of downloading video'),

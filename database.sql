@@ -1,5 +1,6 @@
 DROP TABLE IF EXISTS video;
 DROP TABLE IF EXISTS extra_subscription;
+DROP TABLE IF EXISTS blocklist;
 VACUUM;
 
 CREATE TABLE video
@@ -23,3 +24,9 @@ CREATE TABLE extra_subscription
     channel_id TEXT PRIMARY KEY,
     add_ts     INTEGER DEFAULT (datetime('now', 'localtime'))
 );
+
+CREATE TABLE blocklist
+(
+    video_id   TEXT PRIMARY KEY,
+    add_ts     INTEGER DEFAULT (datetime('now', 'localtime'))
+)

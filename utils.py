@@ -287,4 +287,5 @@ def kill_self() -> None:
 
 
 is_superuser = filters.chat(SUPERUSERS)
+not_a_command = ~filters.regex(r'^/')  # a message that does not start with a slash is not a command
 counter = APIUsageCounter()

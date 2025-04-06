@@ -29,6 +29,13 @@ def is_in_database(video_id: str) -> bool:
         return c.fetchone() is not None
 
 
+def is_in_blocklist(video_id: str) -> bool:
+    """check if video_id exists in the blocklist"""
+    with Connect(DATABASE_FILE) as c:
+        c.execute('SELECT video_id FROM blocklist WHERE video_id = ?', (video_id,))
+        return c.fetchone() is not None
+
+
 def insert_video(video_id: str, message_id: int, size: int, video_info: dict, status: VideoStatus) -> None:
     """insert a video_id into the database and record its message_id when the video is uploaded"""
     with Connect(DATABASE_FILE) as c:
@@ -37,6 +44,12 @@ def insert_video(video_id: str, message_id: int, size: int, video_info: dict, st
         upload_ts = parse_upload_timestamp(video_info)
         c.execute('INSERT INTO video (video_id, message_id, title, duration, size, upload_ts, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
                   (video_id, message_id, title, duration, size, upload_ts, status))
+
+
+def insert_blocklist(video_id: str) -> None:
+    """insert a video_id into the blocklist"""
+    with Connect(DATABASE_FILE) as c:
+        c.execute('INSERT INTO blocklist (video_id) VALUES (?)', (video_id,))
 
 
 def insert_extra_subscription(channel_id: str) -> bool:

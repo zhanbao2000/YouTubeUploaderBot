@@ -175,6 +175,7 @@ class AddResult(int, Enum):
     DUPLICATE_QUEUE = 5  # already in video_queue
     DUPLICATE_RETRY = 6  # already in retry_tasks, but not ready to retry
     DUPLICATE_CURRENT = 7  # worker is currently processing this video
+    BLOCKLIST = 8  # video is in blocklist
 
 
 class RetryReason(str, Enum):
