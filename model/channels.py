@@ -41,7 +41,7 @@ class ContentDetails(BaseModel):
 
 
 class Statistics(BaseModel):
-    viewCount: str
+    viewCount: Optional[str] = None
     subscriberCount: str
     hiddenSubscriberCount: bool
     videoCount: str
