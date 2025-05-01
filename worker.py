@@ -130,7 +130,15 @@ class VideoWorker(object):
         """return pending tasks = waiting + current"""
         return self.video_queue.qsize() + self.is_working
 
-    async def add_task(self, url: str, chat_id: Optional[int], message_id: Optional[int], left: bool = False) -> AddResult:
+    async def add_task(
+            self,
+            url: str,
+            chat_id: Optional[int],
+            message_id: Optional[int],
+            *,
+            left: bool = False,
+            dry_run: bool = False,
+    ) -> AddResult:
         """add a new task, skip if the task already exists in any of the queues or the database to avoid duplication"""
         video_id = get_video_id(url)
         url = create_video_link(video_id)  # re-make URL to differ different URLs that actually refer to the same video_id
@@ -162,15 +170,24 @@ class VideoWorker(object):
             else:
                 return AddResult.DUPLICATE_RETRY
 
-        self.put(Task(url, chat_id, message_id), left)
+        if not dry_run:
+            self.put(Task(url, chat_id, message_id), left)
         return AddResult.SUCCESS
 
-    async def add_task_batch(self, urls: Iterable[str], chat_id: Optional[int], message_id: Optional[int], left: bool = False) -> int:
+    async def add_task_batch(
+            self,
+            urls: Iterable[str],
+            chat_id: Optional[int],
+            message_id: Optional[int],
+            *,
+            left: bool = False,
+            dry_run: bool = False,
+    ) -> int:
         """add tasks in batch, every task will be added individually"""
         count_task_added = 0
 
         for url in urls:
-            if await self.add_task(url, chat_id, message_id, left) == AddResult.SUCCESS:
+            if await self.add_task(url, chat_id, message_id, left=left, dry_run=dry_run) == AddResult.SUCCESS:
                 count_task_added += 1
 
         return count_task_added
@@ -670,7 +687,7 @@ class SchedulerManager(object):
             for playlist_id in playlist_ids.values():
                 video_urls.extend(await get_all_video_urls_from_playlist(playlist_id, 'ASMR', 5))
 
-        await self.worker.add_task_batch(video_urls, None, None, True)
+        await self.worker.add_task_batch(video_urls, None, None, left=True)
 
     async def retry(self) -> None:
         """retry all videos in retry list"""

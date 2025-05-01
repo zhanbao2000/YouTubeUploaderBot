@@ -157,20 +157,23 @@ async def add_list(_, message: Message):
     )
 
 
-@app.on_message(filters.command('add_channel') & is_superuser)
+@app.on_message((filters.command('add_channel') | filters.command('add_channel_dry_run')) & is_superuser)
 async def add_channel(_, message: Message):
     url = get_args(message)
     if not url or not (channel_id := get_channel_id(url) or await get_channel_id_by_link(url)):
         return
+    dry_run = message.command[0] == 'add_channel_dry_run'
+    headline = '(dry run)\n' if dry_run else ''
 
     playlist_id = await get_channel_uploads_playlist_id(channel_id)
     video_urls = await get_all_video_urls_from_playlist(playlist_id, 'ASMR')
     count_urls = len(video_urls)
 
-    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.id)
+    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.id, dry_run=dry_run)
 
     await message.reply_text(
-        text=f'{count_urls} ASMR video(s) in this channel\n'
+        text=f'{headline}'
+             f'{count_urls} ASMR video(s) in this channel\n'
              f'{count_urls - count_urls_filtered} video(s) skipped\n'
              f'{count_urls_filtered} task(s) added',
         quote=True
@@ -362,6 +365,7 @@ if __name__ == '__main__':
         BotCommand(command='stat', description='show statistics'),
         BotCommand(command='add_list', description='add all videos in a playlist'),
         BotCommand(command='add_channel', description='all the videos uploaded by the channel'),
+        BotCommand(command='add_channel_dry_run', description='all the videos uploaded by the channel (dry_run)'),
         BotCommand(command='add_subscription', description='add recent subscription feeds'),
         BotCommand(command='add_extra_subscription', description='add channel into separated subscription list'),
         BotCommand(command='add_blocklist', description='add video into blocklist'),
