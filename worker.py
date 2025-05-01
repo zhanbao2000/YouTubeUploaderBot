@@ -166,12 +166,11 @@ class VideoWorker(object):
 
         if url in self.retry_tasks:
             if is_ready(self.retry_tasks[url]):
-                self.retry_tasks.pop(url)
+                not dry_run and self.retry_tasks.pop(url)
             else:
                 return AddResult.DUPLICATE_RETRY
 
-        if not dry_run:
-            self.put(Task(url, chat_id, message_id), left)
+        not dry_run and self.put(Task(url, chat_id, message_id), left)
         return AddResult.SUCCESS
 
     async def add_task_batch(
