@@ -3,7 +3,7 @@ from io import BytesIO
 from pathlib import Path
 from subprocess import run, DEVNULL
 from time import time
-from typing import Optional
+from typing import Optional, Callable
 
 from PIL import Image, ImageDraw, ImageFont
 from yt_dlp import YoutubeDL
@@ -60,7 +60,7 @@ class AudioFormat(Format):
 
 class DownloadManager(object):
 
-    def __init__(self, url: str, progress_hooks: list[callable] = None):
+    def __init__(self, url: str, progress_hooks: list[Callable[[dict], None]] = None):
         self.url = url
         # the default value of progress_hooks passed to yt-dlp is []
         # however, we need to use this trick to avoid issues with mutable default parameters

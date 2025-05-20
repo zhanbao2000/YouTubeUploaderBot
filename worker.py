@@ -2,7 +2,7 @@ from asyncio import QueueEmpty, Task as AsyncTask, create_task, get_running_loop
 from collections import defaultdict
 from pathlib import Path
 from traceback import format_exc
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Callable
 
 from apscheduler.events import EVENT_JOB_ERROR, JobExecutionEvent
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -261,7 +261,12 @@ class VideoWorker(object):
 
         return video_info
 
-    async def upload_video(self, file: Path, video_info: dict, progress_hook: callable = None) -> Message:
+    async def upload_video(
+            self,
+            file: Path,
+            video_info: dict,
+            progress_hook: Callable[[int, int], None] = None,
+    ) -> Message:
         """upload the video with its thumbnail, and its captures, return the message of the captures"""
         with open(file, 'rb') as video:
             width, height = video_info['width'], video_info['height']
