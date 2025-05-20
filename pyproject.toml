@@ -1,0 +1,17 @@
+[project]
+name = "youtubeuploaderbot"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "apscheduler>=3.11.0",
+    "bgutil-ytdlp-pot-provider>=0.8.5",
+    "httpx>=0.28.1",
+    "pillow>=11.2.1",
+    "psutil>=7.0.0",
+    "pydantic>=2.11.4",
+    "pyrogram>=2.0.106",
+    "pytz>=2025.2",
+    "yt-dlp>=2025.4.30",
+    "yt-dlp-get-pot>=0.3.0",
+]
