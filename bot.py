@@ -382,8 +382,9 @@ if __name__ == '__main__':
         downloads_dir.mkdir()
 
     worker = VideoWorker(app)
-    app.loop.create_task(worker.start())
     scheduler_manager = SchedulerManager(worker, app)
+    app.loop.create_task(worker.start())
+    app.loop.create_task(scheduler_manager.start())
 
     idle()
 

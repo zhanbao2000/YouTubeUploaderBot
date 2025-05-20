@@ -647,6 +647,8 @@ class SchedulerManager(object):
         self.scheduler.add_job(self.retry, 'cron', hour='6,9,12,18', timezone=beijing_tz)
 
         self.scheduler.add_listener(self.on_error, EVENT_JOB_ERROR)
+
+    async def start(self) -> None:
         self.scheduler.start()
 
     def pause(self) -> None:
