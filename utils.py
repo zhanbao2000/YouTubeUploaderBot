@@ -158,11 +158,11 @@ async def on_googleapi_call(request: Request):
         counter.add_timestamp()
 
 
-def get_client(proxies: Optional[str] = None, timeout: float = 15, retries: int = 5, **kwargs) -> AsyncClient:
+def get_client(proxy: Optional[str] = None, timeout: float = 15, retries: int = 5, **kwargs) -> AsyncClient:
     """get a httpx client"""
     return AsyncClient(
         event_hooks={'request': [on_googleapi_call]},
-        proxies=proxies or PROXY_HTTPX,
+        proxy=proxy or PROXY_HTTPX,
         timeout=timeout,
         transport=AsyncHTTPTransport(retries=retries) if retries else None,
         **kwargs
