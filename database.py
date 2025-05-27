@@ -27,6 +27,7 @@ def is_in_database(video_id: str) -> bool:
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT video_id FROM video WHERE video_id = ?', (video_id,))
         return c.fetchone() is not None
+    raise RuntimeError
 
 
 def is_in_blocklist(video_id: str) -> bool:
@@ -34,6 +35,7 @@ def is_in_blocklist(video_id: str) -> bool:
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT video_id FROM blocklist WHERE video_id = ?', (video_id,))
         return c.fetchone() is not None
+    raise RuntimeError
 
 
 def insert_video(video_id: str, message_id: int, size: int, video_info: dict, status: VideoStatus) -> None:
@@ -67,6 +69,7 @@ def delete_extra_subscription(channel_id: str) -> bool:
     with Connect(DATABASE_FILE) as c:
         c.execute('DELETE FROM extra_subscription WHERE channel_id = ?', (channel_id,))
         return c.rowcount > 0
+    raise RuntimeError
 
 
 def update_status(video_id: str, video_status: VideoStatus) -> None:
@@ -89,6 +92,7 @@ def get_all_video_ids() -> list[str]:
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT video_id FROM video WHERE message_id != 0')
         return [video_id for video_id, in c.fetchall()]
+    raise RuntimeError
 
 
 def get_all_extra_subscription_channel_ids() -> list[str]:
@@ -96,6 +100,7 @@ def get_all_extra_subscription_channel_ids() -> list[str]:
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT channel_id FROM extra_subscription')
         return [channel_id for channel_id, in c.fetchall()]
+    raise RuntimeError
 
 
 def get_upload_message_id(video_id: str) -> int:
@@ -111,6 +116,7 @@ def get_backup_videos_count() -> int:
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT COUNT(*) FROM video WHERE message_id != 0')
         return c.fetchone()[0]
+    raise RuntimeError
 
 
 def get_unavailable_videos_count() -> int:
@@ -118,6 +124,7 @@ def get_unavailable_videos_count() -> int:
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT COUNT(*) FROM video WHERE status < 0')
         return c.fetchone()[0]
+    raise RuntimeError
 
 
 def get_extra_subscriptions_count() -> int:
@@ -125,6 +132,7 @@ def get_extra_subscriptions_count() -> int:
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT COUNT(*) FROM extra_subscription')
         return c.fetchone()[0]
+    raise RuntimeError
 
 
 def get_video_count_by_status(status: VideoStatus) -> int:
@@ -132,6 +140,7 @@ def get_video_count_by_status(status: VideoStatus) -> int:
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT COUNT(*) FROM video WHERE status = ?', (status,))
         return c.fetchone()[0]
+    raise RuntimeError
 
 
 def get_backup_videos_total_size() -> int:
@@ -139,6 +148,7 @@ def get_backup_videos_total_size() -> int:
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT SUM(size) FROM video')
         return c.fetchone()[0] or 0
+    raise RuntimeError
 
 
 def get_backup_videos_total_duration() -> int:
@@ -146,3 +156,4 @@ def get_backup_videos_total_duration() -> int:
     with Connect(DATABASE_FILE) as c:
         c.execute('SELECT SUM(duration) FROM video')
         return c.fetchone()[0] or 0
+    raise RuntimeError

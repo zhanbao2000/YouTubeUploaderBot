@@ -213,6 +213,7 @@ class VideoWorker(object):
                 text=text,
                 **kwargs
             )
+        return None
 
     async def clear_download_folder(self) -> None:
         """clear the download folder and reply to the user"""
@@ -232,11 +233,13 @@ class VideoWorker(object):
         """reply when the video is successfully downloaded and uploaded"""
         if self.session_reply_on_success:
             return await self.reply(text, **kwargs)
+        return None
 
     async def reply_failure(self, text: str, **kwargs) -> Optional[Message]:
         """reply when the video is failed to download or upload"""
         if self.session_reply_on_failure:
             return await self.reply(text, **kwargs)
+        return None
 
     async def reply_task_done(self) -> None:
         """inform the user that this task had been done"""
