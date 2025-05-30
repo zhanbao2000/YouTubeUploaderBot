@@ -48,7 +48,14 @@ from youtube import (
     get_video_id,
 )
 
-app = Client('YouTubeUploaderBot', api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN, proxy=PROXY_TELEGRAM)
+app = Client(
+    'YouTubeUploaderBot',
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN,
+    proxy=PROXY_TELEGRAM,
+    ipv6=True,
+)
 
 
 @app.on_message(filters.command('hello'))
