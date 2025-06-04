@@ -13,7 +13,7 @@ from pyrogram import filters
 from pyrogram.enums import MessageEntityType
 from pyrogram.types import Message, MessageEntity
 
-from config import PROXY_HTTPX, PROXY_YT_DLP, SUPERUSERS
+from config import ASMR_KEYWORDS, PROXY_HTTPX, PROXY_YT_DLP, SUPERUSERS
 from typedef import Channel
 
 T = TypeVar('T')
@@ -284,6 +284,11 @@ def join_list(separator: list[T], *lists: list[T]) -> Generator[T, None, None]:
 def kill_self() -> None:
     """kill the bot process"""
     kill(getpid(), 9)
+
+
+def is_asmr_video(title: str) -> bool:
+    """check if the video title contains ASMR keywords"""
+    return any(keyword.lower() in title.lower() for keyword in ASMR_KEYWORDS)
 
 
 is_superuser = filters.chat(SUPERUSERS)

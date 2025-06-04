@@ -173,7 +173,7 @@ async def add_channel(_, message: Message):
     headline = '(dry run)\n' if dry_run else ''
 
     playlist_id = await get_channel_uploads_playlist_id(channel_id)
-    video_urls = await get_all_video_urls_from_playlist(playlist_id, 'ASMR')
+    video_urls = await get_all_video_urls_from_playlist(playlist_id, True)
     count_urls = len(video_urls)
 
     count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.id, dry_run=dry_run)
@@ -199,7 +199,7 @@ async def add_subscription(_, message: Message):
         playlist_ids = await get_channel_uploads_playlist_id_batch(batch_channel_ids)
 
         for playlist_id in playlist_ids.values():
-            video_urls.extend(await get_all_video_urls_from_playlist(playlist_id, 'ASMR', 5))
+            video_urls.extend(await get_all_video_urls_from_playlist(playlist_id, True, 5))
 
     count_urls = len(video_urls)
 

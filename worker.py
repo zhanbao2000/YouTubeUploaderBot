@@ -694,7 +694,7 @@ class SchedulerManager(object):
             playlist_ids = await get_channel_uploads_playlist_id_batch(batch_channel_ids)
 
             for playlist_id in playlist_ids.values():
-                video_urls.extend(await get_all_video_urls_from_playlist(playlist_id, 'ASMR', 5))
+                video_urls.extend(await get_all_video_urls_from_playlist(playlist_id, True, 5))
 
         await self.worker.add_task_batch(video_urls, None, None, left=True)
 

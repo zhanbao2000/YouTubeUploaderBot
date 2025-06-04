@@ -15,7 +15,7 @@ from model.playlistItems import PlaylistItems
 from model.subscriptions import Subscriptions
 from model.videos import Videos
 from typedef import IncompleteTranscodingError, VideoStatus, VideoTooShortError
-from utils import format_date, format_duration_without_unit, format_file_size, get_client, get_proxy_yt_dlp
+from utils import format_date, format_duration_without_unit, format_file_size, get_client, get_proxy_yt_dlp, is_asmr_video
 
 
 class Format(object):
@@ -412,7 +412,7 @@ async def is_video_available_online_batch(video_ids: list[str]) -> dict[str, boo
     return result
 
 
-async def get_all_video_urls_from_playlist(playlist_id: str, filter_str: str = '', limit: int = 0) -> list[str]:
+async def get_all_video_urls_from_playlist(playlist_id: str, check_asmr: bool = False, limit: int = 0) -> list[str]:
     """get all video urls from a playlist"""
     params = {
         'part': 'snippet',
@@ -431,7 +431,7 @@ async def get_all_video_urls_from_playlist(playlist_id: str, filter_str: str = '
             for playlist_item in playlist_items.items:
                 video_id = playlist_item.snippet.resourceId.videoId
 
-                if filter_str.lower() in playlist_item.snippet.title.lower():
+                if not check_asmr or is_asmr_video(playlist_item.snippet.title):
                     result.append(f'https://www.youtube.com/watch?v={video_id}')
 
                 if limit and len(result) >= limit:
