@@ -38,14 +38,11 @@ wheels = [
 
 [[package]]
 name = "bgutil-ytdlp-pot-provider"
-version = "0.8.5"
+version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "yt-dlp-get-pot" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/16/86/e1ada104bee843335ba2e19e4a619c3aa0cc3e099045036356b9c1aa654b/bgutil_ytdlp_pot_provider-0.8.5.tar.gz", hash = "sha256:cd91a28a41c0acc2bd65b269276064452d18b9e7b52ae5e55a895b0092573719", size = 8677, upload_time = "2025-05-17T17:27:08.378Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ef/d7/7d4678d0715be62382eeb60467c2a215c568990d7cbc8c2d8e2821949004/bgutil_ytdlp_pot_provider-1.1.0.tar.gz", hash = "sha256:75acedfa92cbe22d071ee6a3142bedd4094115b69cdec84a467b58ae25c7196d", size = 8363, upload_time = "2025-06-02T01:11:08.54Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c3/38/388e0e2cd26fad2256e5046d4fbd84ff50a87904422692fbaea38bba2caf/bgutil_ytdlp_pot_provider-0.8.5-py3-none-any.whl", hash = "sha256:bc517788d82ff1139d17e56d79ce90d52ea821a02cdd679abb3fe88f954d4624", size = 9309, upload_time = "2025-05-17T17:27:07.288Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/45/ab392317dccf6661f4578ab523a540227b4f5bd35df64e750ebe70d30dd2/bgutil_ytdlp_pot_provider-1.1.0-py3-none-any.whl", hash = "sha256:25bea57effcf5ef82de584d4ca843387cec7900a52b331d269ed6e0a85395fa8", size = 8993, upload_time = "2025-06-02T01:11:06.944Z" },
 ]
 
 [[package]]
@@ -239,11 +236,11 @@ wheels = [
 
 [[package]]
 name = "typing-extensions"
-version = "4.13.2"
+version = "4.14.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f6/37/23083fcd6e35492953e8d2aaaa68b860eb422b34627b13f2ce3eb6106061/typing_extensions-4.13.2.tar.gz", hash = "sha256:e6c81219bd689f51865d9e372991c540bda33a0379d5573cddb9a3a23f7caaef", size = 106967, upload_time = "2025-04-10T14:19:05.416Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d1/bc/51647cd02527e87d05cb083ccc402f93e441606ff1f01739a62c8ad09ba5/typing_extensions-4.14.0.tar.gz", hash = "sha256:8676b788e32f02ab42d9e7c61324048ae4c6d844a399eebace3d4979d75ceef4", size = 107423, upload_time = "2025-06-02T14:52:11.399Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8b/54/b1ae86c0973cc6f0210b53d508ca3641fb6d0c56823f288d108bc7ab3cc8/typing_extensions-4.13.2-py3-none-any.whl", hash = "sha256:a439e7c04b49fec3e5d3e2beaa21755cadbbdc391694e28ccdd36ca4a1408f8c", size = 45806, upload_time = "2025-04-10T14:19:03.967Z" },
+    { url = "https://files.pythonhosted.org/packages/69/e0/552843e0d356fbb5256d21449fa957fa4eff3bbc135a74a691ee70c7c5da/typing_extensions-4.14.0-py3-none-any.whl", hash = "sha256:a1514509136dd0b477638fc68d6a91497af5076466ad0fa6c338e44e359944af", size = 43839, upload_time = "2025-06-02T14:52:10.026Z" },
 ]
 
 [[package]]
@@ -299,24 +296,24 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "apscheduler", specifier = ">=3.11.0" },
-    { name = "bgutil-ytdlp-pot-provider", specifier = ">=0.8.5" },
+    { name = "bgutil-ytdlp-pot-provider", specifier = ">=1.1.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "pillow", specifier = ">=11.2.1" },
     { name = "psutil", specifier = ">=7.0.0" },
-    { name = "pydantic", specifier = ">=2.11.4" },
+    { name = "pydantic", specifier = ">=2.11.5" },
     { name = "pyrogram", specifier = ">=2.0.106" },
     { name = "pytz", specifier = ">=2025.2" },
-    { name = "yt-dlp", specifier = ">=2025.4.30" },
+    { name = "yt-dlp", specifier = ">=2025.6.9" },
     { name = "yt-dlp-get-pot", specifier = ">=0.3.0" },
 ]
 
 [[package]]
 name = "yt-dlp"
-version = "2025.5.22"
+version = "2025.6.9"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/09/93/695cef32796dc7e76597e68a267a34a1b4e29bef8e12da445fa7c0ad1e55/yt_dlp-2025.5.22.tar.gz", hash = "sha256:ea73854c5dabc124f29a35a8fae9bc5d422ef3231bebeea2bdfa82ac191a9c29", size = 3017654, upload_time = "2025-05-22T09:58:35.694Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b7/fb/588a23e61586960273524d3aa726bd148116d422854f727f4d59c254cb6a/yt_dlp-2025.6.9.tar.gz", hash = "sha256:751f53a3b61353522bf805fa30bbcbd16666126537e39706eab4f8c368f111ac", size = 3028379, upload_time = "2025-06-09T23:53:10.448Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/25/68/4f108193ebce3ee7beb5f9a21daa6bc875e261150b510be468626f151959/yt_dlp-2025.5.22-py3-none-any.whl", hash = "sha256:a49c4b76afeaded6254c3e2b759d8d5a13271aa963d5fccb51fe059d1c313151", size = 3264137, upload_time = "2025-05-22T09:58:32.613Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/e1/fa0dd2150b7b1033d917f37067c594160772fa607f311f10d4b881768b36/yt_dlp-2025.6.9-py3-none-any.whl", hash = "sha256:ebdfda9ffa807f6a26aed7c8f906e5557cd06b4c388dc547df1ec2078631fca8", size = 3276143, upload_time = "2025-06-09T23:53:07.746Z" },
 ]
 
 [[package]]
