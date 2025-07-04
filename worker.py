@@ -656,7 +656,7 @@ class SchedulerManager(object):
 
         self.scheduler.add_listener(self.on_error, EVENT_JOB_ERROR)
 
-    async def start(self) -> None:
+    async def start(self) -> None:  # NOSONAR: python:S7503, AsyncIOScheduler.start should be called within an event loop
         self.scheduler.start()
 
     def pause(self) -> None:
