@@ -405,7 +405,7 @@ async def is_video_available_online_batch(video_ids: list[str]) -> dict[str, boo
         resp = await client.get('https://youtube.googleapis.com/youtube/v3/videos', params=params)
         videos = Videos(**resp.json())
 
-    result = {video_id: False for video_id in video_ids}
+    result = dict.fromkeys(video_ids, False)
     for video in videos.items:
         result[video.id] = True
 

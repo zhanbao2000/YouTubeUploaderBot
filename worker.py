@@ -79,7 +79,7 @@ class VideoWorker(object):
         self.current_task: Optional[Task] = None
         self.download_progress_status: Optional[DownloadProgressStatus] = None
         self.upload_progress_status: Optional[UploadProgressStatus] = None
-        self.retry_tasks: dict[str, float] = dict()  # save the urls of the task that need to be retried and the timestamps of their next retries
+        self.retry_tasks: dict[str, float] = {}  # save the urls of the task that need to be retried and the timestamps of their next retries
 
         self.session_uploaded_files = 0  # total number of files that have been uploaded since startup
         self.session_uploaded_size = 0  # total size of files that have been uploaded since startup
@@ -497,7 +497,7 @@ class VideoChecker(object):
         self.count_become_unavailable = 0
         self.count_all_available = 0
         self.count_all_unavailable = 0
-        self.count_all_unavailable_by_reasons: dict[VideoStatus, int] = dict.fromkeys((status for status in VideoStatus), 0)
+        self.count_all_unavailable_by_reasons: dict[VideoStatus, int] = dict.fromkeys(VideoStatus, 0)
         self.count_all_unavailable_by_channel: defaultdict[Channel, int] = defaultdict(int)
         self.terminated_or_closed_accounts: set[Channel] = set()
 

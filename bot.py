@@ -261,7 +261,7 @@ async def remove_invalid_subscription(_, message: Message):
         if channel_id in channel_ids_my_subscription and delete_extra_subscription(channel_id)
     )
 
-    playlist_ids = dict()  # channel_id -> playlist_id
+    playlist_ids = {}  # channel_id -> playlist_id
     for channel_ids in batched(channel_ids_extra_subscription, 50):
         playlist_ids.update(await get_channel_uploads_playlist_id_batch(channel_ids))
 
