@@ -221,7 +221,7 @@ class VideoWorker(object):
             file.unlink()
             await self.reply_failure(f'deleted {file.name}')
 
-    async def clear_queue(self) -> None:
+    def clear_queue(self) -> None:
         """immediately clear all waiting tasks, will not cancel current task"""
         while not self.video_queue.empty():
             try:

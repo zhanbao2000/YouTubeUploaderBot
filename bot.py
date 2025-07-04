@@ -286,7 +286,7 @@ async def clear(_, message: Message):
              f'{len(worker.retry_tasks)} retry task(s) cancelled',
         quote=True
     )
-    await worker.clear_queue()
+    worker.clear_queue()
     worker.retry_tasks.clear()
 
 
