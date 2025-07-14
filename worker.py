@@ -198,7 +198,7 @@ class VideoWorker(object):
         for url, next_retry_ts in self.retry_tasks.copy().items():  # use copy() to avoid 'RuntimeError: dictionary changed size during iteration'
             if is_ready(next_retry_ts):
                 self.retry_tasks.pop(url)  # use pop() before add_task() since add_task() will check if url in self.retry_tasks
-                await self.add_task(url, chat_id, message_id)
+                await self.add_task(url, chat_id, message_id, left=True)
                 count_task_added += 1
 
         return count_task_added
