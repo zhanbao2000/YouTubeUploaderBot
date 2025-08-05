@@ -281,7 +281,7 @@ class VideoWorker(object):
                 progress=progress_hook
             )
             captures_message = await self.app.send_photo(
-                chat_id=CHAT_ID, photo=get_captures(file, video_info),
+                chat_id=CHAT_ID, photo=await get_captures(file, video_info),
                 caption=get_video_caption(video_info), reply_to_message_id=video_message.id
             )
 

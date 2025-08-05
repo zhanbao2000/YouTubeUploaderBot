@@ -1,7 +1,8 @@
 import re
+from asyncio import create_subprocess_exec
 from io import BytesIO
 from pathlib import Path
-from subprocess import run, DEVNULL
+from subprocess import DEVNULL
 from time import time
 from typing import Optional, Callable
 
@@ -329,7 +330,7 @@ async def get_thumbnail(url: str, width: int, height: int) -> BytesIO:
     return jpeg_data
 
 
-def get_captures(video: Path, video_info: dict) -> BytesIO:
+async def get_captures(video: Path, video_info: dict) -> BytesIO:
     """generate video captures (4x3) from video file"""
     temp_path = Path(DOWNLOAD_ROOT)
 
@@ -348,15 +349,17 @@ def get_captures(video: Path, video_info: dict) -> BytesIO:
         timestamp = format_duration_without_unit(time_position)
         output_file = temp_path / f'frame_{index:02d}.png'
 
-        run([
+        proc = await create_subprocess_exec(
             'bin/ffmpeg',
             '-ss', str(time_position),
             '-i', str(video),
             '-vframes', '1',
             '-q:v', '2',
             '-y',
-            str(output_file)
-        ], check=True, stdout=DEVNULL, stderr=DEVNULL)
+            str(output_file),
+            stdout=DEVNULL, stderr=DEVNULL
+        )
+        await proc.wait()
 
         # paste resized frame to grid image
         image = Image.open(output_file).resize(target_frame_size)
