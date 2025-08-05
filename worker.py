@@ -292,7 +292,7 @@ class VideoWorker(object):
 
     def generate_current_task_status(self) -> str:
         """generate a status message for the current task"""
-        if self.is_working is False:
+        if not self.is_working:
             return 'idle'
 
         ds = self.download_progress_status
@@ -307,17 +307,17 @@ class VideoWorker(object):
 
         if ds.in_progress is False and ds.finished is False:
             message2 = 'waiting for yt-dlp to get video info ...'
-        elif ds.in_progress is True:
+        elif ds.in_progress:
             message2 = (f'downloading: {format_file_size(ds.transferred)}/{format_file_size(ds.total)} '
                         f'({ds.get_percentage():.1f}%) '
                         f'{ds.get_avg_speed_formatted()} ETA {ds.get_eta()}')
         elif ds.finished is True and us.in_progress is False and us.finished is False:
             message2 = 'merging video and audio ...'
-        elif us.in_progress is True:
+        elif us.in_progress:
             message2 = (f'uploading: {format_file_size(us.transferred)}/{format_file_size(us.total)} '
                         f'({us.get_percentage():.1f}%) '
                         f'{us.get_avg_speed_formatted()} ETA {us.get_eta()}')
-        elif us.finished is True:
+        elif us.finished:
             message2 = 'generating captures ...'
         else:
             message2 = 'Error'
