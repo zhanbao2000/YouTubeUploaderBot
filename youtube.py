@@ -353,7 +353,9 @@ async def get_captures(video: Path, video_info: dict) -> BytesIO:
             'bin/ffmpeg',
             '-ss', str(time_position),
             '-i', str(video),
+            '-vf', f'scale={target_frame_size[0]}:{target_frame_size[1]}',
             '-vframes', '1',
+            '-c:v', 'mjpeg',
             '-q:v', '2',
             '-y',
             str(output_file),
@@ -362,7 +364,7 @@ async def get_captures(video: Path, video_info: dict) -> BytesIO:
         await proc.wait()
 
         # paste resized frame to grid image
-        image = Image.open(output_file).resize(target_frame_size)
+        image = Image.open(output_file)
 
         draw = ImageDraw.Draw(image)
         draw.text((8, 5), timestamp, fill=(255, 255, 255, 255), font=font, stroke_width=1, stroke_fill=(0, 0, 0, 255))
