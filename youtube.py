@@ -2,7 +2,7 @@ import re
 from asyncio import create_subprocess_exec
 from io import BytesIO
 from pathlib import Path
-from subprocess import DEVNULL
+from subprocess import DEVNULL, PIPE
 from time import time
 from typing import Optional, Callable
 
@@ -332,8 +332,6 @@ async def get_thumbnail(url: str, width: int, height: int) -> BytesIO:
 
 async def get_captures(video: Path, video_info: dict) -> BytesIO:
     """generate video captures (4x3) from video file"""
-    temp_path = Path(DOWNLOAD_ROOT)
-
     interval = video_info['duration'] / 13
     ratio = video_info['width'] / video_info['height']
     target_frame_size = (480, int(480 / ratio))  # single frame size
@@ -347,7 +345,6 @@ async def get_captures(video: Path, video_info: dict) -> BytesIO:
         # generate frames
         time_position = int((index + 1) * interval)
         timestamp = format_duration_without_unit(time_position)
-        output_file = temp_path / f'frame_{index:02d}.png'
 
         proc = await create_subprocess_exec(
             'bin/ffmpeg',
@@ -357,27 +354,24 @@ async def get_captures(video: Path, video_info: dict) -> BytesIO:
             '-vframes', '1',
             '-c:v', 'mjpeg',
             '-q:v', '2',
-            '-y',
-            str(output_file),
-            stdout=DEVNULL, stderr=DEVNULL
+            '-f', 'image2pipe',
+            '-',  # use stdout as output
+            stdout=PIPE, stderr=DEVNULL
         )
-        await proc.wait()
+        stdout, _ = await proc.communicate()
 
         # paste resized frame to grid image
-        image = Image.open(output_file)
+        image = Image.open(BytesIO(stdout))
 
         draw = ImageDraw.Draw(image)
         draw.text((8, 5), timestamp, fill=(255, 255, 255, 255), font=font, stroke_width=1, stroke_fill=(0, 0, 0, 255))
 
-        row, col = index // 4, index % 4
+        row, col = divmod(index, 4)
         x = col * target_frame_size[0]
         y = row * target_frame_size[1]
         grid_image.paste(image, (x, y))
 
     grid_image.save(result, format='PNG')
-
-    for file in temp_path.glob('frame_*.png'):
-        file.unlink(missing_ok=True)
 
     return result
 
