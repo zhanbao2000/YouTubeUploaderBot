@@ -130,7 +130,7 @@ class VideoWorker(object):
         """return pending tasks = waiting + current"""
         return self.video_queue.qsize() + self.is_working
 
-    async def add_task(
+    def add_task(
             self,
             url: str,
             chat_id: Optional[int],
@@ -173,7 +173,7 @@ class VideoWorker(object):
         not dry_run and self.put(Task(url, chat_id, message_id), left)
         return AddResult.SUCCESS
 
-    async def add_task_batch(
+    def add_task_batch(
             self,
             urls: Iterable[str],
             chat_id: Optional[int],
@@ -186,19 +186,19 @@ class VideoWorker(object):
         count_task_added = 0
 
         for url in urls:
-            if await self.add_task(url, chat_id, message_id, left=left, dry_run=dry_run) == AddResult.SUCCESS:
+            if self.add_task(url, chat_id, message_id, left=left, dry_run=dry_run) == AddResult.SUCCESS:
                 count_task_added += 1
 
         return count_task_added
 
-    async def add_task_retry(self, chat_id: Optional[int], message_id: Optional[int]) -> int:
+    def add_task_retry(self, chat_id: Optional[int], message_id: Optional[int]) -> int:
         """retry all ready tasks in retry_tasks."""
         count_task_added = 0
 
         for url, next_retry_ts in self.retry_tasks.copy().items():  # use copy() to avoid 'RuntimeError: dictionary changed size during iteration'
             if is_ready(next_retry_ts):
                 self.retry_tasks.pop(url)  # use pop() before add_task() since add_task() will check if url in self.retry_tasks
-                await self.add_task(url, chat_id, message_id, left=True)
+                self.add_task(url, chat_id, message_id, left=True)
                 count_task_added += 1
 
         return count_task_added
@@ -696,8 +696,8 @@ class SchedulerManager(object):
             for playlist_id in playlist_ids.values():
                 video_urls.extend(await get_all_video_urls_from_playlist(playlist_id, True, 5))
 
-        await self.worker.add_task_batch(video_urls, None, None, left=True)
+        self.worker.add_task_batch(video_urls, None, None, left=True)
 
-    async def retry(self) -> None:
+    def retry(self) -> None:
         """retry all videos in retry list"""
-        await self.worker.add_task_retry(None, None)
+        self.worker.add_task_retry(None, None)

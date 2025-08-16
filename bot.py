@@ -83,7 +83,7 @@ async def check(_, message: Message):
 @app.on_message(filters.command('retry') & is_superuser)
 async def retry(_, message: Message):
     count_urls = len(worker.retry_tasks)
-    count_urls_filtered = await worker.add_task_retry(message.chat.id, message.id)
+    count_urls_filtered = worker.add_task_retry(message.chat.id, message.id)
 
     await message.reply_text(
         text=f'{count_urls} video(s) in current retry list\n'
@@ -154,7 +154,7 @@ async def add_list(_, message: Message):
     video_urls = await get_all_video_urls_from_playlist(playlist_id)
     count_urls = len(video_urls)
 
-    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.id)
+    count_urls_filtered = worker.add_task_batch(video_urls, message.chat.id, message.id)
 
     await message.reply_text(
         text=f'{count_urls} video(s) in this list\n'
@@ -176,7 +176,7 @@ async def add_channel(_, message: Message):
     video_urls = await get_all_video_urls_from_playlist(playlist_id, True)
     count_urls = len(video_urls)
 
-    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.id, dry_run=dry_run)
+    count_urls_filtered = worker.add_task_batch(video_urls, message.chat.id, message.id, dry_run=dry_run)
 
     await message.reply_text(
         text=f'{headline}'
@@ -203,7 +203,7 @@ async def add_subscription(_, message: Message):
 
     count_urls = len(video_urls)
 
-    count_urls_filtered = await worker.add_task_batch(video_urls, message.chat.id, message.id)
+    count_urls_filtered = worker.add_task_batch(video_urls, message.chat.id, message.id)
 
     await message.reply_text(
         text=f'{count_urls} video(s) in recent feeds\n'
@@ -339,7 +339,7 @@ async def toggle_scheduler(_, message: Message):
 @app.on_message(not_a_command & filters.regex(r'(?:youtube\.com/(?:watch\?v=|live/)|youtu\.be/)([0-9A-Za-z_-]{11})') & is_superuser)
 async def youtube_url_regex(_, message: Message):
     url = str(message.text)
-    add_result = await worker.add_task(url, message.chat.id, message.id)
+    add_result = worker.add_task(url, message.chat.id, message.id)
 
     if add_result is AddResult.SUCCESS:
         reply = f'task added\ntotal task(s): {worker.get_pending_tasks_count()}'
