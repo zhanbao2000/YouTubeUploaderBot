@@ -117,7 +117,7 @@ class DownloadProgressStatus(ProgressStatus):
             self.in_progress = True
             self.transferred = video_info.get('downloaded_bytes', 0)
             self.total = video_info.get('total_bytes', 0) or video_info.get('total_bytes_estimate', 0)
-            self.title = video_info.get('info_dict', {}).get('title', '')
+            self.title = video_info.get('info_dict', {}).get('title', 'Unknown')
         else:
             self.in_progress = False
             self.finished = True
