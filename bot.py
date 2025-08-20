@@ -35,7 +35,7 @@ from utils import (
     kill_self,
     not_a_command,
 )
-from worker import SchedulerManager, VideoChecker, VideoWorker
+from worker import SchedulerManager, VideoChecker, VideoDownloadWorker, VideoUploadWorker
 from youtube import (
     get_all_my_subscription_channel_ids,
     get_all_video_urls_from_playlist,
@@ -82,8 +82,8 @@ async def check(_, message: Message):
 
 @app.on_message(filters.command('retry') & is_superuser)
 async def retry(_, message: Message):
-    count_urls = len(worker.retry_tasks)
-    count_urls_filtered = worker.add_task_retry(message.chat.id, message.id)
+    count_urls = len(download_worker.retry_tasks)
+    count_urls_filtered = download_worker.add_task_retry(message.chat.id, message.id)
 
     await message.reply_text(
         text=f'{count_urls} video(s) in current retry list\n'
@@ -103,16 +103,20 @@ async def stat(_, message: Message):
              uptime: {get_uptime()}
 
              session upload
-               uploaded files: {worker.session_uploaded_files}
-               uploaded size: {format_file_size(worker.session_uploaded_size)}
+               uploaded files: {upload_worker.session_uploaded_files}
+               uploaded size: {format_file_size(upload_worker.session_uploaded_size)}
 
              session tasks
-               pending tasks: {worker.get_pending_tasks_count()}
-               retry list size: {len(worker.retry_tasks)}
-               retry ready: {sum(is_ready(next_retry_ts) for next_retry_ts in worker.retry_tasks.values())}
+               pending download tasks: {download_worker.get_pending_tasks_count()}
+               pending upload tasks: {upload_worker.get_pending_tasks_count()}
+               retry list size: {len(download_worker.retry_tasks)}
+               retry ready: {sum(is_ready(next_retry_ts) for next_retry_ts in download_worker.retry_tasks.values())}
                
-             current task
-               {worker.generate_current_task_status()}
+             current download
+               {download_worker.generate_current_task_status()}
+
+             current upload
+               {upload_worker.generate_current_task_status()}
 
              video count
                backup videos count: {get_backup_videos_count()}
@@ -122,10 +126,8 @@ async def stat(_, message: Message):
                total duration: {format_duration(get_backup_videos_total_duration())}
 
              settings
-               notify on success: {worker.session_reply_on_success}
-               notify on failure: {worker.session_reply_on_failure}
                scheduler status: {scheduler_manager.get_running_status()}
-               download max size: {worker.session_download_max_size} MB
+               download max size: {download_worker.session_download_max_size} MB
 
              API calls
                google api calls (1m): {counter.count_last_minute()}
@@ -154,7 +156,7 @@ async def add_list(_, message: Message):
     video_urls = await get_all_video_urls_from_playlist(playlist_id)
     count_urls = len(video_urls)
 
-    count_urls_filtered = worker.add_task_batch(video_urls, message.chat.id, message.id)
+    count_urls_filtered = download_worker.add_task_batch(video_urls, message.chat.id, message.id)
 
     await message.reply_text(
         text=f'{count_urls} video(s) in this list\n'
@@ -176,7 +178,7 @@ async def add_channel(_, message: Message):
     video_urls = await get_all_video_urls_from_playlist(playlist_id, True)
     count_urls = len(video_urls)
 
-    count_urls_filtered = worker.add_task_batch(video_urls, message.chat.id, message.id, dry_run=dry_run)
+    count_urls_filtered = download_worker.add_task_batch(video_urls, message.chat.id, message.id, dry_run=dry_run)
 
     await message.reply_text(
         text=f'{headline}'
@@ -203,7 +205,7 @@ async def add_subscription(_, message: Message):
 
     count_urls = len(video_urls)
 
-    count_urls_filtered = worker.add_task_batch(video_urls, message.chat.id, message.id)
+    count_urls_filtered = download_worker.add_task_batch(video_urls, message.chat.id, message.id)
 
     await message.reply_text(
         text=f'{count_urls} video(s) in recent feeds\n'
@@ -282,12 +284,12 @@ async def remove_invalid_subscription(_, message: Message):
 @app.on_message(filters.command('clear') & is_superuser)
 async def clear(_, message: Message):
     await message.reply_text(
-        text=f'{worker.video_queue.qsize()} pending task(s) cancelled\n'
-             f'{len(worker.retry_tasks)} retry task(s) cancelled',
+        text=f'{download_worker.video_queue.qsize()} pending download task(s) cancelled\n'
+             f'{len(download_worker.retry_tasks)} retry task(s) cancelled',
         quote=True
     )
-    worker.clear_queue()
-    worker.retry_tasks.clear()
+    download_worker.clear_queue()
+    download_worker.retry_tasks.clear()
 
 
 @app.on_message(filters.command('set_download_max_size') & is_superuser)
@@ -300,30 +302,8 @@ async def set_download_max_size(_, message: Message):
         await message.reply_text('size must be greater than 100 MB', quote=True)
         return
 
-    worker.session_download_max_size = int(size)
-    await message.reply_text(f'max size set to {worker.session_download_max_size} MB', quote=True)
-
-
-@app.on_message(filters.command('toggle_reply_on_success') & is_superuser)
-async def toggle_reply_on_success(_, message: Message):
-    worker.session_reply_on_success = not worker.session_reply_on_success
-    await message.reply_text(
-        text=f'current notification setting\n'
-             f'on success: {worker.session_reply_on_success}\n'
-             f'on failure: {worker.session_reply_on_failure}',
-        quote=True
-    )
-
-
-@app.on_message(filters.command('toggle_reply_on_failure') & is_superuser)
-async def toggle_reply_on_failure(_, message: Message):
-    worker.session_reply_on_failure = not worker.session_reply_on_failure
-    await message.reply_text(
-        text=f'current notification setting\n'
-             f'on success: {worker.session_reply_on_success}\n'
-             f'on failure: {worker.session_reply_on_failure}',
-        quote=True
-    )
+    download_worker.session_download_max_size = int(size)
+    await message.reply_text(f'max size set to {download_worker.session_download_max_size} MB', quote=True)
 
 
 @app.on_message(filters.command('toggle_scheduler') & is_superuser)
@@ -339,10 +319,10 @@ async def toggle_scheduler(_, message: Message):
 @app.on_message(not_a_command & filters.regex(r'(?:youtube\.com/(?:watch\?v=|live/)|youtu\.be/)([0-9A-Za-z_-]{11})') & is_superuser)
 async def youtube_url_regex(_, message: Message):
     url = str(message.text)
-    add_result = worker.add_task(url, message.chat.id, message.id)
+    add_result = download_worker.add_task(url, message.chat.id, message.id)
 
     if add_result is AddResult.SUCCESS:
-        reply = f'task added\ntotal task(s): {worker.get_pending_tasks_count()}'
+        reply = f'task added\ntotal task(s): {download_worker.get_pending_tasks_count()}'
     elif add_result is AddResult.DUPLICATE_DATABASE_UPLOADED:
         video_message_id = get_upload_message_id(get_video_id(url))
         reply = f'this video has been uploaded\n{create_message_link(CHAT_ID, video_message_id)}'
@@ -379,8 +359,6 @@ if __name__ == '__main__':
         BotCommand(command='remove_invalid_subscription', description='remove all duplicated and banned subscriptions'),
         BotCommand(command='clear', description='clear both retry and pending tasks'),
         BotCommand(command='set_download_max_size', description='set max size of downloading video'),
-        BotCommand(command='toggle_reply_on_success', description='change success notification setting'),
-        BotCommand(command='toggle_reply_on_failure', description='change failure notification setting'),
         BotCommand(command='toggle_scheduler', description='change scheduler status'),
     ])
 
@@ -388,9 +366,15 @@ if __name__ == '__main__':
     if not downloads_dir.exists():
         downloads_dir.mkdir()
 
-    worker = VideoWorker(app)
-    scheduler_manager = SchedulerManager(worker, app)
-    app.loop.create_task(worker.start())
+    download_worker = VideoDownloadWorker(app)
+    upload_worker = VideoUploadWorker(app)
+    download_worker.set_upload_worker(upload_worker)
+    upload_worker.set_download_worker(download_worker)
+
+    scheduler_manager = SchedulerManager(download_worker, app)
+
+    app.loop.create_task(download_worker.start())
+    app.loop.create_task(upload_worker.start())
     app.loop.create_task(scheduler_manager.start())
 
     idle()

@@ -67,7 +67,7 @@ class DownloadManager(object):
         # however, we need to use this trick to avoid issues with mutable default parameters
         self.progress_hooks = progress_hooks or []
         self.video_id = get_video_id(url)
-        self.file = Path(f'{DOWNLOAD_ROOT}/{self.video_id}.mp4')
+        self.file = Path(f'{DOWNLOAD_ROOT}/{self.video_id}/{self.video_id}.mp4')
 
         if not self.video_id:
             raise RuntimeError(f'Cannot get video id from url:\n{url}')

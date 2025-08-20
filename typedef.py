@@ -1,5 +1,6 @@
 from asyncio import Queue, QueueFull
 from enum import Enum
+from pathlib import Path
 from time import time
 from typing import NamedTuple, Optional
 
@@ -141,18 +142,11 @@ class Channel(NamedTuple):
     url: str
 
 
-class Task(object):
-    def __init__(
-            self,
-            url: str,
-            chat_id: Optional[int] = None,
-            message_id: Optional[int] = None,
-            use_cookies: Optional[bool] = False,
-    ):
+class URLSpecificTask(object):
+    """A class to represent a task that is specific to a URL, such as downloading or uploading a video."""
+
+    def __init__(self, url: str):
         self.url = url
-        self.chat_id = chat_id
-        self.message_id = message_id
-        self.use_cookies = use_cookies
 
     # override __hash__() and __eq__() so that set() only considers url when deduplicating
 
@@ -160,11 +154,43 @@ class Task(object):
         return hash(self.url)
 
     def __eq__(self, other):
-        if isinstance(other, Task):
+        if isinstance(other, DownloadTask):
             return self.url == other.url
         if isinstance(other, str):
             return self.url == other
         return False
+
+
+class DownloadTask(URLSpecificTask):
+    def __init__(
+            self,
+            url: str,
+            chat_id: Optional[int] = None,
+            message_id: Optional[int] = None,
+            use_cookies: Optional[bool] = False,
+    ):
+        super().__init__(url)
+        self.chat_id = chat_id
+        self.message_id = message_id
+        self.use_cookies = use_cookies
+
+
+class UploadTask(URLSpecificTask):
+    def __init__(
+            self,
+            path: Path,
+            video_info: dict,
+            url: str,
+            chat_id: Optional[int] = None,
+            message_id: Optional[int] = None,
+    ):
+        super().__init__(url)
+        self.file = path
+        self.video_info = video_info
+        self.chat_id = chat_id
+        self.message_id = message_id
+
+        self.video_id = video_info['id']
 
 
 class AddResult(int, Enum):

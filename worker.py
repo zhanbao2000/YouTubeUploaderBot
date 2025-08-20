@@ -1,4 +1,4 @@
-from asyncio import QueueEmpty, Task as AsyncTask, create_task, get_running_loop, sleep, to_thread
+from asyncio import QueueEmpty, Task, create_task, get_running_loop, sleep, to_thread
 from collections import defaultdict
 from pathlib import Path
 from traceback import format_exc
@@ -13,7 +13,7 @@ from pyrogram.types import Message
 from pytz import timezone
 from yt_dlp.utils import YoutubeDLError
 
-from config import CHAT_ID, DOWNLOAD_ROOT, SUPERUSERS
+from config import CHAT_ID, SUPERUSERS
 from database import (
     get_all_extra_subscription_channel_ids,
     get_all_video_ids,
@@ -29,12 +29,14 @@ from database import (
 from typedef import (
     AddResult,
     Channel,
+    DownloadTask,
     DownloadProgressStatus,
     HashTag,
     IncompleteTranscodingError,
+    ProgressStatus,
     RetryReason,
-    Task,
     UniqueQueue,
+    UploadTask,
     UploadProgressStatus,
     VideoStatus,
     VideoTooShortError,
@@ -72,38 +74,30 @@ from youtube import (
 
 class VideoWorker(object):
     def __init__(self, app: Client):
-        self.is_working = False
         self.app = app
 
-        self.video_queue: UniqueQueue[Task] = UniqueQueue()
-        self.current_task: Optional[Task] = None
-        self.download_progress_status: Optional[DownloadProgressStatus] = None
-        self.upload_progress_status: Optional[UploadProgressStatus] = None
-        self.retry_tasks: dict[str, float] = {}  # save the urls of the task that need to be retried and the timestamps of their next retries
+        self.worker_name: str = self.__class__.__name__
+        self.video_queue: UniqueQueue = UniqueQueue()
+        self.current_task: Optional[DownloadTask | UploadTask] = None
+        self.progress_status: Optional[ProgressStatus] = None
 
-        self.session_uploaded_files = 0  # total number of files that have been uploaded since startup
-        self.session_uploaded_size = 0  # total size of files that have been uploaded since startup
-        self.session_download_max_size = 2000  # max size of single format allowed when extracting video info (MB)
-        self.session_reply_on_success = True
-        self.session_reply_on_failure = True
-
-        self.worker_task: Optional[AsyncTask] = None  # the task of the worker, used to restart the worker
+        self.worker_task: Optional[Task] = None  # the task of the worker, used to restart the worker
 
     async def start(self) -> None:
         """start the worker and worker monitor"""
         self.worker_task = create_task(self.work())
         self.worker_task.add_done_callback(self.on_worker_stopped_async_wrapper)
 
-        await self.app.send_message(chat_id=SUPERUSERS[0], text='worker started')
+        await self.app.send_message(chat_id=SUPERUSERS[0], text=f'{self.worker_name} started')
 
-    def on_worker_stopped_async_wrapper(self, task: AsyncTask) -> None:
+    def on_worker_stopped_async_wrapper(self, task: Task) -> None:
         """async wrapper for on_worker_stopped"""
         loop = self.app.loop or get_running_loop()
         loop.create_task(self.on_worker_stopped(task))
 
-    async def on_worker_stopped(self, task: AsyncTask) -> None:
+    async def on_worker_stopped(self, task: Task) -> None:
         """handle worker stopped event"""
-        self.is_working = False
+        self.progress_status = None
 
         e = task.exception()
         if isinstance(e, YoutubeDLError):
@@ -113,22 +107,206 @@ class VideoWorker(object):
 
         await self.app.send_message(
             chat_id=SUPERUSERS[0],
-            text=f'worker stopped, reason:\n{msg}\nworker will restart in 10 seconds'
+            text=f'{self.worker_name} stopped, reason:\n{msg}\n{self.worker_name} will restart in 10 seconds'
         )
 
         await sleep(10)
         await self.start()
 
-    def put(self, task: Task, left: bool = False) -> None:
+    def get_pending_tasks_count(self) -> int:
+        """return pending tasks = waiting + current"""
+        return self.video_queue.qsize() + (self.progress_status is not None)
+
+    async def reply(self, text: str, **kwargs) -> Optional[Message]:
+        """reply to the message which triggered current task"""
+        # if current_task does not provide chat_id or message_id, ignore
+        if self.current_task.chat_id and self.current_task.message_id:
+            return await self.app.send_message(
+                chat_id=self.current_task.chat_id,
+                reply_to_message_id=self.current_task.message_id,
+                text=text,
+                **kwargs
+            )
+        return None
+
+    async def clear_download_folder(self, file: Path) -> None:
+        """clear the download folder, delete all files in the folder and the folder itself"""
+        # normally delete video file without warning
+        file.unlink(missing_ok=True)
+
+        # delete all remaining files in this folder, this only happens when the download ends abnormally
+        for subfile in file.parent.glob('*'):
+            subfile.unlink()
+            await self.reply(f'deleted {subfile.name}')
+
+        # delete the folder itself
+        if file.parent.exists():
+            file.parent.rmdir()
+
+    def clear_queue(self) -> None:
+        """immediately clear all waiting tasks, will not cancel current task"""
+        while not self.video_queue.empty():
+            try:
+                self.video_queue.get_nowait()
+            except QueueEmpty:
+                continue
+
+    def generate_current_task_status(self) -> str:
+        """generate a status message for the current task"""
+        raise NotImplementedError
+
+    async def work(self) -> None:
+        raise NotImplementedError
+
+
+class VideoUploadWorker(VideoWorker):
+    def __init__(self, app: Client):
+        super().__init__(app)
+
+        self.worker_name = 'uploader'
+        self.video_queue: UniqueQueue[UploadTask] = UniqueQueue(maxsize=5)
+        self.current_task: Optional[UploadTask] = None
+        self.progress_status: Optional[UploadProgressStatus] = None
+
+        self.download_worker: Optional[VideoDownloadWorker] = None
+
+        self.session_uploaded_files = 0  # total number of files that have been uploaded since startup
+        self.session_uploaded_size = 0  # total size of files that have been uploaded since startup
+
+    def set_download_worker(self, download_worker: 'VideoDownloadWorker') -> None:
+        """set the download worker for this upload worker"""
+        self.download_worker = download_worker
+
+    def generate_current_task_status(self) -> str:
+        """generate a status message for the current task"""
+        status = self.progress_status
+
+        if status is None:
+            return 'idle'
+
+        video_id = get_video_id(self.current_task.url)
+        title = self.current_task.video_info.get('title', 'Unknown')
+        message1 = f'video: {create_video_link_markdown(video_id, title)}'
+
+        if status.in_progress:
+            message2 = (f'uploading: {format_file_size(status.transferred)}/{format_file_size(status.total)} '
+                        f'({status.get_percentage():.1f}%) '
+                        f'{status.get_avg_speed_formatted()} ETA {status.get_eta()}')
+        elif status.finished:
+            message2 = 'generating captures ...'
+        else:
+            message2 = 'about to start ...'
+
+        return (f'{message1}\n'
+                f'               {message2}')  # the second message should be started with spaces to align with the first message
+
+    async def upload_video(
+            self,
+            file: Path,
+            video_info: dict,
+            progress_hook: Callable[[int, int], None] = None,
+    ) -> Message:
+        """upload the video with its thumbnail, and its captures, return the message of the captures"""
+        with open(file, 'rb') as video:  # NOSONAR(S7493)  pyrogram.client.Client.send_video requires sync BinaryIO object
+            width, height = video_info['width'], video_info['height']
+            video_message = await self.app.send_video(
+                chat_id=CHAT_ID, video=video, file_name=file.name,
+                supports_streaming=True, duration=video_info['duration'],
+                width=width, height=height,
+                thumb=await get_thumbnail(video_info['thumbnail'], width, height),
+                progress=progress_hook
+            )
+            captures_message = await self.app.send_photo(
+                chat_id=CHAT_ID, photo=await get_captures(file, video_info),
+                caption=get_video_caption(video_info), reply_to_message_id=video_message.id
+            )
+
+            self.session_uploaded_files += 1
+            self.session_uploaded_size += file.stat().st_size
+
+            return captures_message
+
+    async def on_finish(self, task: UploadTask, thumbnail_message: Optional[Message]):
+        """handle upload finish event"""
+        if thumbnail_message is None:
+            insert_video(task.video_id, 0, task.file.stat().st_size, task.video_info, VideoStatus.ERROR_ON_UPLOADING)
+        else:
+            insert_video(task.video_id, thumbnail_message.id, task.file.stat().st_size, task.video_info, VideoStatus.AVAILABLE)
+
+        await self.clear_download_folder(task.file)
+        self.progress_status = None
+        self.video_queue.task_done()
+
+    async def work(self) -> None:
+        """main upload loop"""
+        while True:
+            self.current_task = await self.video_queue.get()
+            self.progress_status = UploadProgressStatus()
+            thumbnail_message: Optional[Message] = None
+
+            try:
+                thumbnail_message = await self.upload_video(self.current_task.file, self.current_task.video_info, self.progress_status.update)
+
+            except Exception:  # noqa
+                await self.reply(f'error on uploading this video: {create_video_link_markdown(self.current_task.video_id)}\n'
+                                 f'{format_exc().splitlines()[-1]}')
+
+            finally:
+                await self.on_finish(self.current_task, thumbnail_message)
+
+
+class VideoDownloadWorker(VideoWorker):
+    def __init__(self, app: Client):
+        super().__init__(app)
+
+        self.worker_name = 'downloader'
+        self.video_queue: UniqueQueue[DownloadTask] = UniqueQueue()
+        self.current_task: Optional[DownloadTask] = None
+        self.progress_status: Optional[DownloadProgressStatus] = None
+
+        self.video_upload_worker: Optional[VideoUploadWorker] = None
+
+        self.session_download_max_size = 2000  # max size of single format allowed when extracting video info (MB)
+        self.retry_tasks: dict[str, float] = {}  # save the urls of the task that need to be retried and the timestamps of their next retries
+
+    def set_upload_worker(self, upload_worker: 'VideoUploadWorker') -> None:
+        """set the upload worker for this download worker"""
+        self.video_upload_worker = upload_worker
+
+    def generate_current_task_status(self) -> str:
+        """generate a status message for the current task"""
+        status = self.progress_status
+
+        if status is None:
+            return 'idle'
+
+        video_id = get_video_id(self.current_task.url)
+        if status.title == 'Unknown':
+            video_link_markdown = create_video_link_markdown(video_id)
+        else:
+            video_link_markdown = create_video_link_markdown(video_id, status.title)
+        message1 = f'video: {video_link_markdown}'
+
+        if status.in_progress is False and status.finished is False:
+            message2 = 'waiting for yt-dlp to get video info ...'
+        elif status.in_progress:
+            message2 = (f'downloading: {format_file_size(status.transferred)}/{format_file_size(status.total)} '
+                        f'({status.get_percentage():.1f}%) '
+                        f'{status.get_avg_speed_formatted()} ETA {status.get_eta()}')
+        elif status.finished:
+            message2 = 'merging video and audio ...'
+        else:
+            message2 = 'Error'
+
+        return (f'{message1}\n'
+                f'               {message2}')  # the second message should be started with spaces to align with the first message
+
+    def put(self, task: DownloadTask, left: bool = False) -> None:
         """put a task into the queue, if left is True, put the task into the front of the queue"""
         if left:
             self.video_queue.put_left_nowait(task)
         else:
             self.video_queue.put_nowait(task)
-
-    def get_pending_tasks_count(self) -> int:
-        """return pending tasks = waiting + current"""
-        return self.video_queue.qsize() + self.is_working
 
     def add_task(
             self,
@@ -158,7 +336,7 @@ class VideoWorker(object):
             else:
                 return AddResult.DUPLICATE_DATABASE_FAILED
 
-        if self.is_working and url == self.current_task.url:
+        if self.progress_status is not None and url == self.current_task.url or url in self.video_upload_worker.video_queue:
             return AddResult.DUPLICATE_CURRENT
 
         if url in self.video_queue:
@@ -170,7 +348,7 @@ class VideoWorker(object):
             else:
                 return AddResult.DUPLICATE_RETRY
 
-        not dry_run and self.put(Task(url, chat_id, message_id), left)
+        not dry_run and self.put(DownloadTask(url, chat_id, message_id), left)
         return AddResult.SUCCESS
 
     def add_task_batch(
@@ -203,51 +381,6 @@ class VideoWorker(object):
 
         return count_task_added
 
-    async def reply(self, text: str, **kwargs) -> Optional[Message]:
-        """reply to the message which triggered current task"""
-        # if current_task does not provide chat_id or message_id, ignore
-        if self.current_task.chat_id and self.current_task.message_id:
-            return await self.app.send_message(
-                chat_id=self.current_task.chat_id,
-                reply_to_message_id=self.current_task.message_id,
-                text=text,
-                **kwargs
-            )
-        return None
-
-    async def clear_download_folder(self) -> None:
-        """clear the download folder and reply to the user"""
-        for file in Path(DOWNLOAD_ROOT).glob('*'):
-            file.unlink()
-            await self.reply_failure(f'deleted {file.name}')
-
-    def clear_queue(self) -> None:
-        """immediately clear all waiting tasks, will not cancel current task"""
-        while not self.video_queue.empty():
-            try:
-                self.video_queue.get_nowait()
-            except QueueEmpty:
-                continue
-
-    async def reply_success(self, text: str, **kwargs) -> Optional[Message]:
-        """reply when the video is successfully downloaded and uploaded"""
-        if self.session_reply_on_success:
-            return await self.reply(text, **kwargs)
-        return None
-
-    async def reply_failure(self, text: str, **kwargs) -> Optional[Message]:
-        """reply when the video is failed to download or upload"""
-        if self.session_reply_on_failure:
-            return await self.reply(text, **kwargs)
-        return None
-
-    async def reply_task_done(self) -> None:
-        """inform the user that this task had been done"""
-        if (qsize := self.video_queue.qsize()) > 0:
-            await self.reply_success(f'task finished\npending task(s): {qsize}')
-        else:
-            await self.reply_success('all tasks finished')
-
     async def download_video(self, dm: DownloadManager, use_cookies: bool = False) -> dict:
         """download the video, return the video info"""
         video_info = await to_thread(dm.download_max_size, self.session_download_max_size, use_cookies)
@@ -256,74 +389,13 @@ class VideoWorker(object):
         # it has nothing to do with the `session_download_max_size`
         if (filesize := dm.file.stat().st_size) >= 2e9:
             dm.file.unlink()
-            await self.reply_failure(f'{create_video_link_markdown(dm.video_id)}\n'
-                                     f'file too big: {format_file_size(filesize)}\n'
-                                     f'try downloading smaller format')
+            await self.reply(f'{create_video_link_markdown(dm.video_id)}\n'
+                             f'file too big: {format_file_size(filesize)}\n'
+                             f'try downloading smaller format')
             video_info = await to_thread(dm.download_max_size, int(self.session_download_max_size * 0.8), use_cookies)  # retry with smaller format
             # if this format is still too big, the video_id will be recorded in db with message_id = 0
 
         return video_info
-
-    async def upload_video(
-            self,
-            file: Path,
-            video_info: dict,
-            progress_hook: Callable[[int, int], None] = None,
-    ) -> Message:
-        """upload the video with its thumbnail, and its captures, return the message of the captures"""
-        with open(file, 'rb') as video:  # NOSONAR(S7493)  pyrogram.client.Client.send_video requires sync BinaryIO object
-            width, height = video_info['width'], video_info['height']
-            video_message = await self.app.send_video(
-                chat_id=CHAT_ID, video=video, file_name=file.name,
-                supports_streaming=True, duration=video_info['duration'],
-                width=width, height=height,
-                thumb=await get_thumbnail(video_info['thumbnail'], width, height),
-                progress=progress_hook
-            )
-            captures_message = await self.app.send_photo(
-                chat_id=CHAT_ID, photo=await get_captures(file, video_info),
-                caption=get_video_caption(video_info), reply_to_message_id=video_message.id
-            )
-
-            self.session_uploaded_files += 1
-            self.session_uploaded_size += file.stat().st_size
-
-            return captures_message
-
-    def generate_current_task_status(self) -> str:
-        """generate a status message for the current task"""
-        if not self.is_working:
-            return 'idle'
-
-        ds = self.download_progress_status
-        us = self.upload_progress_status
-
-        video_id = get_video_id(self.current_task.url)
-        if ds.title == 'Unknown':
-            video_link_markdown = create_video_link_markdown(video_id)
-        else:
-            video_link_markdown = create_video_link_markdown(video_id, ds.title)
-        message1 = f'video: {video_link_markdown}'
-
-        if ds.in_progress is False and ds.finished is False:
-            message2 = 'waiting for yt-dlp to get video info ...'
-        elif ds.in_progress:
-            message2 = (f'downloading: {format_file_size(ds.transferred)}/{format_file_size(ds.total)} '
-                        f'({ds.get_percentage():.1f}%) '
-                        f'{ds.get_avg_speed_formatted()} ETA {ds.get_eta()}')
-        elif ds.finished is True and us.in_progress is False and us.finished is False:
-            message2 = 'merging video and audio ...'
-        elif us.in_progress:
-            message2 = (f'uploading: {format_file_size(us.transferred)}/{format_file_size(us.total)} '
-                        f'({us.get_percentage():.1f}%) '
-                        f'{us.get_avg_speed_formatted()} ETA {us.get_eta()}')
-        elif us.finished:
-            message2 = 'generating captures ...'
-        else:
-            message2 = 'Error'
-
-        return (f'{message1}\n'
-                f'               {message2}')  # the second message should be started with spaces to align with the first message
 
     async def on_too_short_video(self, dm: DownloadManager, e: VideoTooShortError) -> None:
         """handle error of VideoTooShortError"""
@@ -331,8 +403,8 @@ class VideoWorker(object):
         duration = video_info['duration']
 
         insert_video(dm.video_id, 0, 0, video_info, VideoStatus.TOO_SHORT)
-        await self.reply_failure(f'error on downloading this video: {create_video_link_markdown(dm.video_id)}\n'
-                                 f'Too short video, duration: {duration}\n')
+        await self.reply(f'error on downloading this video: {create_video_link_markdown(dm.video_id)}\n'
+                         f'Too short video, duration: {duration}\n')
 
     async def on_error_should_use_cookies(self, dm: DownloadManager, e: YoutubeDLError) -> bool:
         """handle error of video that should use cookies"""
@@ -343,8 +415,8 @@ class VideoWorker(object):
             task.use_cookies = True
             # add this task into the front of the queue to retry with cookies immediately
             self.video_queue.put_left_nowait(task)
-            await self.reply_failure(f'encountered age-restricted video, retrying with cookies immediately: '
-                                     f'{create_video_link_markdown(dm.video_id)}')
+            await self.reply(f'encountered age-restricted video, retrying with cookies immediately: '
+                             f'{create_video_link_markdown(dm.video_id)}')
             return True
 
         return False
@@ -386,8 +458,8 @@ class VideoWorker(object):
         if retry_reason:
             next_retry_ts = get_next_retry_ts(msg)
             self.retry_tasks[dm.url] = next_retry_ts
-            await self.reply_failure(f'{retry_reason}: {create_video_link_markdown(dm.video_id)}\n{msg}\n'
-                                     f'this url has been saved to retry list, it will retry after {format_timestamp(next_retry_ts)}')
+            await self.reply(f'{retry_reason}: {create_video_link_markdown(dm.video_id)}\n{msg}\n'
+                             f'this url has been saved to retry list, it will retry after {format_timestamp(next_retry_ts)}')
             return True
 
         return False
@@ -403,8 +475,8 @@ class VideoWorker(object):
         if any(token in msg for token in members_only_tokens):
             # yt-dlp cannot fetch video_info of members-only videos, so the video_info should be empty
             insert_video(dm.video_id, 0, 0, {}, VideoStatus.MEMBERS_ONLY)
-            await self.reply_failure(f'error on downloading this member-only video: '
-                                     f'{create_video_link_markdown(dm.video_id)}')
+            await self.reply(f'error on downloading this member-only video: '
+                             f'{create_video_link_markdown(dm.video_id)}')
             return True
 
         return False
@@ -415,7 +487,7 @@ class VideoWorker(object):
 
         if 'This live stream recording is not available' in msg:
             insert_video(dm.video_id, 0, 0, {}, VideoStatus.UNAVAILABLE_RECORD)
-            await self.reply_failure(f'This live stream recording is not available: {create_video_link_markdown(dm.video_id)}\n')
+            await self.reply(f'This live stream recording is not available: {create_video_link_markdown(dm.video_id)}\n')
             return True
 
         return False
@@ -430,43 +502,25 @@ class VideoWorker(object):
                 await self.on_error_should_retry(dm, e),
                 await self.on_error_unavailable_live_stream_recording(dm, e),
         )):
-            await self.reply_failure(f'error on downloading this video: '
-                                     f'{create_video_link_markdown(dm.video_id)}\n{msg}')
+            await self.reply(f'error on downloading this video: '
+                             f'{create_video_link_markdown(dm.video_id)}\n{msg}')
 
-    async def on_finish(self, dm: DownloadManager, video_info: Optional[dict], thumbnail_message: Optional[Message]) -> None:
-        """handle finish event"""
-        if video_info is None:  # download failed
-            pass
-        elif thumbnail_message is None:  # download successful, upload failed
-            insert_video(dm.video_id, 0, dm.file.stat().st_size, video_info, VideoStatus.ERROR_ON_UPLOADING)
-        else:  # both download and upload successful
-            insert_video(dm.video_id, thumbnail_message.id, dm.file.stat().st_size, video_info, VideoStatus.AVAILABLE)
-
-        dm.file.unlink(missing_ok=True)
-
-        await self.clear_download_folder()
-        self.is_working = False
-        self.download_progress_status = None
-        self.upload_progress_status = None
+    async def on_finish(self, dm: DownloadManager, video_info: Optional[dict]) -> None:
+        """handle download finish event"""
+        video_info is None and await self.clear_download_folder(dm.file)  # only clear the download folder if the download failed
+        self.progress_status = None
         self.video_queue.task_done()
 
     async def work(self) -> None:
-        """main work loop"""
+        """main download loop"""
         while True:
-            self.download_progress_status = DownloadProgressStatus()
-            self.upload_progress_status = UploadProgressStatus()
             self.current_task = await self.video_queue.get()
-            dm = DownloadManager(self.current_task.url, [self.download_progress_status.update])
-
-            self.is_working = True
-            # determine whether the download or upload is successful by setting its initial value to None,
-            # in finally block, if the value is still None, it means the download or upload is failed
-            video_info: Optional[dict] = None  # for download
-            thumbnail_message: Optional[Message] = None  # for upload
+            self.progress_status = DownloadProgressStatus()
+            video_info: Optional[dict] = None
+            dm = DownloadManager(self.current_task.url, [self.progress_status.update])
 
             try:
                 video_info = await self.download_video(dm, self.current_task.use_cookies)
-                thumbnail_message = await self.upload_video(dm.file, video_info, self.upload_progress_status.update)
 
             except VideoTooShortError as e:
                 await self.on_too_short_video(dm, e)
@@ -475,14 +529,16 @@ class VideoWorker(object):
                 await self.on_download_error(dm, e)
 
             except Exception:  # noqa
-                await self.reply_failure(f'error on uploading this video: {create_video_link_markdown(dm.video_id)}\n'
-                                         f'{format_exc().splitlines()[-1]}')
+                await self.reply(f'error on downloading this video: {create_video_link_markdown(dm.video_id)}\n'
+                                 f'{format_exc().splitlines()[-1]}')
 
             else:
-                await self.reply_task_done()
+                await self.video_upload_worker.video_queue.put(UploadTask(
+                    dm.file, video_info, self.current_task.url, self.current_task.chat_id, self.current_task.message_id
+                ))
 
             finally:
-                await self.on_finish(dm, video_info, thumbnail_message)
+                await self.on_finish(dm, video_info)
 
 
 class VideoChecker(object):
@@ -645,7 +701,7 @@ class VideoChecker(object):
 
 
 class SchedulerManager(object):
-    def __init__(self, worker: VideoWorker, app: Client):
+    def __init__(self, worker: VideoDownloadWorker, app: Client):
         self.worker = worker
         self.app = app
         self.scheduler = AsyncIOScheduler()
