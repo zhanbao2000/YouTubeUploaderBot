@@ -152,7 +152,7 @@ def batched(lst: list[T], n: int) -> Generator[list[T], None, None]:
         yield lst[start:start + n]
 
 
-async def on_googleapi_call(request: Request):  # NOSONAR: python:S7503, see https://www.python-httpx.org/advanced/event-hooks/
+async def on_googleapi_call(request: Request):  # NOSONAR(S7503)  see https://www.python-httpx.org/advanced/event-hooks/
     """hook function that records the timestamp of a Google API call"""
     if request.url.host.endswith('googleapis.com'):
         counter.add_timestamp()

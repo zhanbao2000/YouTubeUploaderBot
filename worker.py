@@ -271,7 +271,7 @@ class VideoWorker(object):
             progress_hook: Callable[[int, int], None] = None,
     ) -> Message:
         """upload the video with its thumbnail, and its captures, return the message of the captures"""
-        with open(file, 'rb') as video:  # NOSONAR: python:S7493 pyrogram.client.Client.send_video requires sync BinaryIO object
+        with open(file, 'rb') as video:  # NOSONAR(S7493)  pyrogram.client.Client.send_video requires sync BinaryIO object
             width, height = video_info['width'], video_info['height']
             video_message = await self.app.send_video(
                 chat_id=CHAT_ID, video=video, file_name=file.name,
@@ -657,7 +657,7 @@ class SchedulerManager(object):
 
         self.scheduler.add_listener(self.on_error, EVENT_JOB_ERROR)
 
-    async def start(self) -> None:  # NOSONAR: python:S7503, AsyncIOScheduler.start should be called within an event loop
+    async def start(self) -> None:  # NOSONAR(S7503)  AsyncIOScheduler.start should be called within an event loop
         self.scheduler.start()
 
     def pause(self) -> None:
