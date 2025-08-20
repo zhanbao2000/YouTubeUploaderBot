@@ -363,7 +363,8 @@ class VideoWorker(object):
             'A network error has occurred',
             'bytes read',
             'EOF occurred in violation of protocol',
-            'Failed to extract any player response'
+            'Failed to extract any player response',
+            'Requested format is not available'
         )
         live_not_started_error_tokens = (
             'Premieres in',
