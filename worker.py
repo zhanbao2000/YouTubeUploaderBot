@@ -266,7 +266,7 @@ class VideoDownloadWorker(VideoWorker):
 
         self.video_upload_worker: Optional[VideoUploadWorker] = None
 
-        self.session_download_max_size = 2000  # max size of single format allowed when extracting video info (MB)
+        self.session_download_max_size = 1600  # max size of single format allowed when extracting video info (MB)
         self.retry_tasks: dict[str, float] = {}  # save the urls of the task that need to be retried and the timestamps of their next retries
 
     def set_upload_worker(self, upload_worker: 'VideoUploadWorker') -> None:
