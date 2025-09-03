@@ -168,14 +168,8 @@ class VideoUploadWorker(VideoWorker):
         self.current_task: Optional[UploadTask] = None
         self.progress_status: Optional[UploadProgressStatus] = None
 
-        self.download_worker: Optional[VideoDownloadWorker] = None
-
         self.session_uploaded_files = 0  # total number of files that have been uploaded since startup
         self.session_uploaded_size = 0  # total size of files that have been uploaded since startup
-
-    def set_download_worker(self, download_worker: 'VideoDownloadWorker') -> None:
-        """set the download worker for this upload worker"""
-        self.download_worker = download_worker
 
     def generate_current_task_status(self) -> str:
         """generate a status message for the current task"""

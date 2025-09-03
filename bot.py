@@ -369,7 +369,6 @@ if __name__ == '__main__':
     download_worker = VideoDownloadWorker(app)
     upload_worker = VideoUploadWorker(app)
     download_worker.set_upload_worker(upload_worker)
-    upload_worker.set_download_worker(download_worker)
 
     scheduler_manager = SchedulerManager(download_worker, app)
 
