@@ -287,6 +287,8 @@ class VideoDownloadWorker(VideoWorker):
             message2 = (f'downloading: {format_file_size(status.transferred)}/{format_file_size(status.total)} '
                         f'({status.get_percentage():.1f}%) '
                         f'{status.get_avg_speed_formatted()} ETA {status.get_eta()}')
+        elif status.finished and self.video_upload_worker.video_queue.full():
+            message2 = 'waiting for uploader queue to be free ...'
         elif status.finished:
             message2 = 'merging video and audio ...'
         else:
