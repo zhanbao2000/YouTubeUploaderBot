@@ -2,9 +2,11 @@ from asyncio import Queue, QueueFull
 from enum import Enum
 from pathlib import Path
 from time import time
-from typing import NamedTuple, Optional
+from typing import NamedTuple, Optional, TypeVar
 
 from yt_dlp.utils import YoutubeDLError
+
+T = TypeVar('T')
 
 
 class IncompleteTranscodingError(YoutubeDLError):
@@ -17,7 +19,7 @@ class VideoTooShortError(RuntimeError):
         super().__init__()
 
 
-class UniqueQueue(Queue):
+class UniqueQueue(Queue[T]):
     """A queue that ensures all items are unique (set-like). It supports the `in` operator to check for item existence."""
 
     def __init__(self, maxsize=0):

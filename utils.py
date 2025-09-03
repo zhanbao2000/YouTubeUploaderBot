@@ -5,7 +5,7 @@ from platform import system
 from random import choice
 from re import search, sub
 from time import localtime, strftime, time
-from typing import Generator, Optional, TypeVar
+from typing import Generator, Optional
 
 from httpx import AsyncClient, AsyncHTTPTransport, Request
 from psutil import Process
@@ -14,9 +14,8 @@ from pyrogram.enums import MessageEntityType
 from pyrogram.types import Message, MessageEntity
 
 from config import ASMR_KEYWORDS, PROXY_HTTPX, PROXY_YT_DLP, SUPERUSERS
-from typedef import Channel
+from typedef import Channel, T
 
-T = TypeVar('T')
 START_TIME = time()
 
 
