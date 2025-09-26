@@ -12,6 +12,6 @@ dependencies = [
     "pydantic>=2.11.7",
     "pyrogram>=2.0.106",
     "pytz>=2025.2",
-    "yt-dlp>=2025.8.20",
+    "yt-dlp>=2025.9.23",
     "yt-dlp-get-pot>=0.3.0",
 ]
