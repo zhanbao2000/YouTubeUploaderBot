@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import YoutubeDLError
 
-from config import CLIENT_ID, CLIENT_SECRET, DOWNLOAD_ROOT, GCP_APIKEY, REFRESH_TOKEN
+from config import CLIENT_ID, CLIENT_SECRET, DOWNLOAD_ROOT, GCP_APIKEY, REFRESH_TOKEN, NODEJS_PATH
 from model.channels import Channel, Channels
 from model.playlistItems import PlaylistItems
 from model.subscriptions import Subscriptions
@@ -77,6 +77,7 @@ class DownloadManager(object):
         return {
             'player_client': 'web',
             'getpot_bgutil_baseurl': 'http://127.0.0.1:4416',
+            'js_runtimes': {'node': {'path': NODEJS_PATH}},
             'proxy': get_proxy_yt_dlp(),
             'ffmpeg_location': 'bin',
             'concurrent_fragment_downloads': 16,
