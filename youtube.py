@@ -75,10 +75,8 @@ class DownloadManager(object):
     def _get_base_ydl_options(self) -> dict:
         """get base ydl options"""
         return {
-            'player_client': 'web',
             'getpot_bgutil_baseurl': 'http://127.0.0.1:4416',
             'js_runtimes': {'node': {'path': NODEJS_PATH}},
-            'proxy': get_proxy_yt_dlp(),
             'ffmpeg_location': 'bin',
             'concurrent_fragment_downloads': 16,
             'outtmpl': str(self.file),

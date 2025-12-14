@@ -516,7 +516,7 @@ class VideoDownloadWorker(VideoWorker):
             dm = DownloadManager(self.current_task.url, [self.progress_status.update])
 
             try:
-                video_info = await self.download_video(dm, self.current_task.use_cookies)
+                video_info = await self.download_video(dm, True)
 
             except VideoTooShortError as e:
                 await self.on_too_short_video(dm, e)
