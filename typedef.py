@@ -211,6 +211,7 @@ class RetryReason(str, Enum):
     NETWORK_ERROR = 'a network error occurs when upload this video'
     INCOMPLETE_TRANSCODING = 'transcoding for this video is not yet complete on YouTube servers'
     LOGIN_REQUIRED = 'login is required to access this video'
+    RATE_LIMITED = 'your account has been rate-limited by YouTube'
 
 
 class VideoStatus(int, Enum):

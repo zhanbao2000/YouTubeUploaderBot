@@ -14,7 +14,7 @@ from pyrogram.enums import MessageEntityType
 from pyrogram.types import Message, MessageEntity
 
 from config import ASMR_KEYWORDS, PROXY_HTTPX, PROXY_YT_DLP, SUPERUSERS
-from typedef import Channel, T
+from typedef import Channel, T, RetryReason
 
 START_TIME = time()
 
@@ -205,7 +205,7 @@ def find_channel_in_message(message: Message) -> Optional[Channel]:
     return Channel(match.group(1), 'https://www.youtube.com/')
 
 
-def get_next_retry_ts(error_message: str) -> float:
+def get_next_retry_ts(error_message: str, retry_reason: Optional[RetryReason] = None) -> float:
     """get next retry timestamp from error message"""
     match = search(r'in (\d+) (minute|hour|day|year)', error_message)
 
@@ -221,6 +221,8 @@ def get_next_retry_ts(error_message: str) -> float:
             return time() + int(amount) * 365 * 24 * 60 * 60
     elif 'in a few moments' in error_message:
         return time() + 24 * 60 * 60
+    elif retry_reason in (RetryReason.LOGIN_REQUIRED, RetryReason.RATE_LIMITED):
+        return time() + 60 * 60
 
     return time()
 

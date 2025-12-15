@@ -439,7 +439,7 @@ class VideoDownloadWorker(VideoWorker):
             'This live event will begin in',
             'Watch on the latest version of YouTube'
         )
-        retry_reason = ''
+        retry_reason = None
 
         if any(token in msg for token in network_error_tokens):
             retry_reason = RetryReason.NETWORK_ERROR
@@ -450,9 +450,11 @@ class VideoDownloadWorker(VideoWorker):
         elif 'Sign in to confirm you’re not a bot' in msg:
             # when encountering LOGIN_REQUIRED, retrying later may alleviate this error
             retry_reason = RetryReason.LOGIN_REQUIRED
+        elif 'Your account has been rate-limited by YouTube for up to an hour' in msg:
+            retry_reason = RetryReason.RATE_LIMITED
 
         if retry_reason:
-            next_retry_ts = get_next_retry_ts(msg)
+            next_retry_ts = get_next_retry_ts(msg, retry_reason)
             self.retry_tasks[dm.url] = next_retry_ts
             await self.reply(f'{retry_reason}: {create_video_link_markdown(dm.video_id)}\n{msg}\n'
                              f'this url has been saved to retry list, it will retry after {format_timestamp(next_retry_ts)}')
